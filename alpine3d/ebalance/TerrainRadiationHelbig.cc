@@ -53,13 +53,14 @@ TerrainRadiationHelbig::TerrainRadiationHelbig(const mio::Config& cfg, const mio
 	LW_distance_index = (int)ceil(lw_radius / cellsize);
 }
 
-void TerrainRadiationHelbig::getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse, mio::Array2D<double>& terrain)
+void TerrainRadiationHelbig::getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse,
+                                          const mio::Array2D<double>& direct_unshaded_horizontal, mio::Array2D<double>& terrain)
 {
         std::cout << "[i] calc nora radiation" << std::endl;
         tdir = direct;
         tdiff = diffuse;
         Compute();
-	terrain = total_diff;
+	      terrain = total_diff;
 }
 
 void TerrainRadiationHelbig::setMeteo(const mio::Array2D<double> &albedo,const mio::Array2D<double> &ta,const mio::Array2D<double> &rh,const mio::Array2D<double> &ilwr)

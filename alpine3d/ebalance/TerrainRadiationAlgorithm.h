@@ -37,7 +37,8 @@ class TerrainRadiationAlgorithm {
 		TerrainRadiationAlgorithm(const std::string& i_algo) : algo(i_algo) {}
 		virtual ~TerrainRadiationAlgorithm();
 
-		virtual void getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse, mio::Array2D<double>& terrain) = 0;
+		virtual void getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse,
+                              const mio::Array2D<double>& direct_unshaded_horizontal, mio::Array2D<double>& terrain) = 0;
 		virtual void setMeteo(const mio::Array2D<double>& albedo, const mio::Array2D<double>& ta,
 		                      const mio::Array2D<double>& rh, const mio::Array2D<double>& ilwr) = 0;
 		const std::string algo;

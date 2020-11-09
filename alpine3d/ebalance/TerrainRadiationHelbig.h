@@ -41,11 +41,11 @@ inline int CellsRadComparator_Helbig(const void * cell1, const void * cell2)
  * @class  TerrainRadiationHelbig
  * @brief Radiosity terrain radiation.
  * For each cell of the domain, a view factor to every other visible cell of the domain is computed. Then
- * the contributions from the terrain reflected radiations of every visible cell are added until a convergence 
- * criteria is reached. This is described in Helbig, Nora, Henning Löwe, and Michael Lehning, 
- * <i>"Radiosity approach for the shortwave surface radiation balance in complex terrain"</i>, 
+ * the contributions from the terrain reflected radiations of every visible cell are added until a convergence
+ * criteria is reached. This is described in Helbig, Nora, Henning Löwe, and Michael Lehning,
+ * <i>"Radiosity approach for the shortwave surface radiation balance in complex terrain"</i>,
  * Journal of the Atmospheric Sciences, <b>66.9</b> ,2009, pp 2900-2912.
- * 
+ *
  * The following keys in the [EBalance] section control the behavior of the model:
  *      - itEps_SW:  stopping tolerance/iteration error for shortwave radiation --(default: 0.4)--
  *            (make it larger to stop the iteration earlier, i.e. less terrain reflections are
@@ -59,12 +59,12 @@ inline int CellsRadComparator_Helbig(const void * cell1, const void * cell2)
  *            is taken into account --(default: 3000.)--
  *      - lw_radius: the distance radius (in m) around each grid cell until which longwave emission
  *            is taken into account --(default: 1500. (Landl(2007)))--
- *      - vf_in_ram: Progressive Refinement iteration is used; but you can enable storing the view factors 
+ *      - vf_in_ram: Progressive Refinement iteration is used; but you can enable storing the view factors
  *            in memory (in case of sufficient memory capacity --> faster terrain radiation computation)
  *      - sub_crit: substructuring threshold (in %) of the patches in the view factor computation --(default: 0.4)--
  *            note that mccluney(1994) proposes 0.1, i.e. for accurate view factors / radiation exchange
  *            computations a threshold of least 0.1 should be used
- * 
+ *
  * It is also possible to read the view factors from file or write them to a file. The following keys,
  * either in the [Input] or in the [Output] sections define the file names:
  *       - vf_file: file containing the sky view factors
@@ -76,7 +76,8 @@ class TerrainRadiationHelbig: public TerrainRadiationAlgorithm {
 	public:
 		TerrainRadiationHelbig(const mio::Config& i_cfg, const mio::DEMObject& dem_in, const int& i_nbworkers, const std::string& method);
 
-		void getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse, mio::Array2D<double>& terrain);
+		void getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse,
+                      const mio::Array2D<double>& direct_unshaded_horizontal, mio::Array2D<double>& terrain);
 		void setMeteo(const mio::Array2D<double>& albedo, const mio::Array2D<double>& ta,
 		              const mio::Array2D<double>& rh, const mio::Array2D<double>& ilwr);
 

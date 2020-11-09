@@ -92,7 +92,7 @@ class EnergyBalance
 		mio::DEMObject dem;
 		std::vector<mio::MeteoData> vecMeteo;
 		mio::Grid2DObject albedo;
-		mio::Array2D<double> direct, diffuse, reflected;
+		mio::Array2D<double> direct, diffuse, reflected, direct_unshaded_horizontal;
 		mio::Timer timer;
 
 		size_t dimx, dimy;

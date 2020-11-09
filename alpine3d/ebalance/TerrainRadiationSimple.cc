@@ -35,7 +35,8 @@ TerrainRadiationSimple::TerrainRadiationSimple(const mio::DEMObject& dem_in, con
 
 TerrainRadiationSimple::~TerrainRadiationSimple() {}
 
-void TerrainRadiationSimple::getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse, mio::Array2D<double>& terrain)
+void TerrainRadiationSimple::getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse,
+                                          const mio::Array2D<double>& direct_unshaded_horizontal, mio::Array2D<double>& terrain)
 {
 	MPIControl& mpicontrol = MPIControl::instance();
 	terrain.resize(dimx, dimy, 0.);  //so allreduce_sum works properly when it sums full grids
@@ -54,7 +55,7 @@ void TerrainRadiationSimple::getRadiation(const mio::Array2D<double>& direct, mi
 				terrain(ii,jj) = IOUtils::nodata;
 				diff_corr(ii,jj) = IOUtils::nodata;
 			} else {
-				const double terrain_reflected = getAlbedo(ii,jj) * (direct(ii,jj)+diffuse(ii,jj)); //TODO take direct_h instead
+				const double terrain_reflected = getAlbedo(ii,jj) * (direct_unshaded_horizontal(ii,jj)+diffuse(ii,jj)); //TODO take direct_h instead
 				const double terrain_viewFactor = 1. - sky_vf(ii,jj);
 				terrain(ii,jj) = terrain_viewFactor * terrain_reflected;
 				diff_corr(ii,jj) = diffuse(ii,jj) * sky_vf(ii,jj);
@@ -72,17 +73,17 @@ double TerrainRadiationSimple::getAlbedo(const size_t& ii, const size_t& jj)
 {
 	//return albedo_grid(ii,jj); //the easiest variant: the local albedo of the cell
 	if (albedo_grid(ii,jj)==IOUtils::nodata) return IOUtils::nodata;
-	
+
 	static const size_t nr_cells_around = 2;
 	//without considering unsigned value: const size_t ll_min = std::max(0, static_cast<int>(jj-nr_cells_around));
 	const size_t ll_min = (jj-nr_cells_around)>dimy? 0 : jj-nr_cells_around; //since negative values will wrap around
 	const size_t ll_max = std::min(dimy, jj+nr_cells_around+1); //+1 so we can compare with < instead of <=
 	const size_t kk_min = (ii-nr_cells_around)>dimx? 0 : ii-nr_cells_around; //since negative values will wrap around
 	const size_t kk_max = std::min(dimx, ii+nr_cells_around+1); //+1 so we can compare with < instead of <=
-	
+
 	unsigned short int count = 0;
 	double sum = 0.;
-	
+
 	for (size_t ll=ll_min; ll<ll_max; ll++) {
 		for (size_t kk=kk_min; kk<kk_max; kk++) {
 			if (albedo_grid(kk,ll)==IOUtils::nodata) continue;
@@ -90,7 +91,7 @@ double TerrainRadiationSimple::getAlbedo(const size_t& ii, const size_t& jj)
 			count++;
 		}
 	}
-	
+
 	const double albedo = (count!=0)? sum / (double)count : IOUtils::nodata;
 	return albedo;
 }
@@ -114,4 +115,3 @@ void TerrainRadiationSimple::initSkyViewFactors(const mio::DEMObject &dem)
 		}
 	}
 }
-
