@@ -128,6 +128,7 @@ void AlpineControl::Run(Date i_startdate, const unsigned int max_steps)
 		try {
 			if (eb && !snowdrift) { //otherwise snowdrift calls eb.setMeteo()
 				eb->setMeteo(ilwr, ta, rh, p, calcDate);
+				eb->setPVP(calcDate); //FELIX
 			}
 		} catch (std::bad_alloc&) {
 			cout << "[E] AlpineControl : Virtual memory exceeded\n";
@@ -174,6 +175,8 @@ void AlpineControl::Run(Date i_startdate, const unsigned int max_steps)
 	} /* For all times max_steps */
 
 	//Finish the program: Write SNO Files and put final output on the screen
+	if (eb) eb->writeSumPVP(max_steps); //FELIX
+
 	if (snowpack && out_snow && !nocompute){
 		if (isMaster) cout << "[i] Simulation finished, writing output files...\n";
 		snowpack->writeOutputSNO(calcDate);

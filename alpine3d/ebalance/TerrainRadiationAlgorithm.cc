@@ -18,6 +18,7 @@
 #include <alpine3d/ebalance/TerrainRadiationAlgorithm.h>
 #include <alpine3d/ebalance/TerrainRadiationSimple.h>
 #include <alpine3d/ebalance/TerrainRadiationHelbig.h>
+#include <alpine3d/ebalance/TerrainRadiationComplex.h>
 #include <alpine3d/ebalance/TerrainRadiation.h>
 
 #ifdef ENABLE_PETSC
@@ -28,9 +29,9 @@ using namespace std;
 using namespace mio;
 
 TerrainRadiationAlgorithm::~TerrainRadiationAlgorithm() {}
-
+// FELIX: const RadiationField* radfield
 //please document these keywords in EnergyBalance.h
-TerrainRadiationAlgorithm* TerrainRadiationFactory::getAlgorithm(const Config& cfg, const DEMObject &dem, const int& nbworkers)
+TerrainRadiationAlgorithm* TerrainRadiationFactory::getAlgorithm(const Config& cfg, const DEMObject &dem, const int& nbworkers, const RadiationField* radfield, SolarPanel* PVobject)
 {
 	string method = "SIMPLE";
 	cfg.getValue("Terrain_Radiation_Method", "EBalance", method, IOUtils::nothrow);
@@ -40,6 +41,8 @@ TerrainRadiationAlgorithm* TerrainRadiationFactory::getAlgorithm(const Config& c
 		return new TerrainRadiationSimple(dem, method);
 	} else if (method == "HELBIG") {
 		return new TerrainRadiationHelbig(cfg, dem, nbworkers, method);
+	} else if (method == "COMPLEX") {
+		return new TerrainRadiationComplex(cfg, dem, method, radfield, PVobject);
 	} else if (method == "FULL") {
 		return new TerrainRadiation(cfg, dem, nbworkers, method);
 	} else if (method == "PETSC") {

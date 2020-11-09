@@ -19,6 +19,8 @@
 #define TERRAINRADIATIONALGORITHM_H
 
 #include <meteoio/MeteoIO.h>
+#include <alpine3d/ebalance/RadiationField.h>
+#include <alpine3d/ebalance/SolarPanel.h>
 
 //Class for shooting cells
 class CellsList {
@@ -36,9 +38,8 @@ class TerrainRadiationAlgorithm {
 	public:
 		TerrainRadiationAlgorithm(const std::string& i_algo) : algo(i_algo) {}
 		virtual ~TerrainRadiationAlgorithm();
-
-		virtual void getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse,
-                              const mio::Array2D<double>& direct_unshaded_horizontal, mio::Array2D<double>& terrain) = 0;
+		// FELIX: mio::Array2D<double>& direct_unshaded_horizontal
+		virtual void getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse, mio::Array2D<double>& terrain, mio::Array2D<double>& direct_unshaded_horizontal) = 0;
 		virtual void setMeteo(const mio::Array2D<double>& albedo, const mio::Array2D<double>& ta,
 		                      const mio::Array2D<double>& rh, const mio::Array2D<double>& ilwr) = 0;
 		const std::string algo;
@@ -46,7 +47,8 @@ class TerrainRadiationAlgorithm {
 
 class TerrainRadiationFactory {
 	public:
-		static TerrainRadiationAlgorithm* getAlgorithm(const mio::Config& cfg, const mio::DEMObject &dem, const int& nbworkers);
+		// FELIX: const RadiationField* radfield
+		static TerrainRadiationAlgorithm* getAlgorithm(const mio::Config& cfg, const mio::DEMObject &dem, const int& nbworkers, const RadiationField* radfield, SolarPanel* PVPobject);
 
 };
 

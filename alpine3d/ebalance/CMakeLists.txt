@@ -11,6 +11,9 @@ SET(ebalance_sources
 	ebalance/ViewFactorsHelbig.cc
 	ebalance/ViewFactorsSectors.cc
 	ebalance/ViewFactorsCluster.cc
+	ebalance/SolarPanel.cc
+	ebalance/TerrainRadiationComplex.cc
+	ebalance/SnowBRDF.cc
 )
 
 IF(PETSC)

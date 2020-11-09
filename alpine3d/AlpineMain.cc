@@ -204,7 +204,7 @@ inline void parseCmdLine(int argc, char **argv, Config &cfg)
 	}
 }
 
-inline void setStaticData(const Config &cfg, IOManager& io, DEMObject &dem, Grid2DObject &landuse, std::vector<Coords> &vec_pts)
+inline void setStaticData(const Config &cfg, IOManager& io, DEMObject &dem, Grid2DObject &landuse, std::vector<Coords> &vec_pts, std::vector<std::vector<double> > &pv_pts)
 {
 	const bool isMaster = MPIControl::instance().master(); // Check if this process is the master (always true for non-parallel mode)
 
@@ -237,6 +237,29 @@ inline void setStaticData(const Config &cfg, IOManager& io, DEMObject &dem, Grid
 				std::cout << "[i] Using " << vec_pts.size() << " POI\n";
 		}
 
+		if (cfg.keyExists("PVP", "Input")) {
+			io.readPVP(pv_pts);
+
+			std::vector<Coords> co_vec;
+			for (size_t ii=0; ii<pv_pts.size(); ii++) {
+				Coords point;
+				//point.setLatLon(pv_pts[ii][0], pv_pts[ii][1], pv_pts[ii][2]);
+				point.setXY(pv_pts[ii][0], pv_pts[ii][1], pv_pts[ii][2]);
+				co_vec.push_back(point);
+			}
+
+			if (!dem.gridify(co_vec, true)) { //keep invalid points
+				if (isMaster) cerr << "[E] Some PVP are invalid or outside the DEM:\n";
+				for (size_t ii=0; ii<co_vec.size(); ii++) 
+					if (!co_vec[ii].indexIsValid() && isMaster) 
+						std::cout  << "[E] Point " << ii << "\t" << co_vec[ii].toString(Coords::CARTESIAN) << "\n";
+				throw InvalidArgumentException("Invalid PVP, please check in the logs", AT);
+			} else if (isMaster)
+				std::cout << "[i] Using " << pv_pts.size() << " PVP\n";
+		}
+
+
+
 		bool local_coords = false;
 		cfg.getValue("COMPUTE_IN_LOCAL_COORDS", "Input", local_coords, IOUtils::nothrow);
 		if (local_coords) {
@@ -251,14 +274,14 @@ inline void setStaticData(const Config &cfg, IOManager& io, DEMObject &dem, Grid
 	MPIControl::instance().broadcast(vec_pts);
 }
 
-inline void setModules(const Config &cfg, IOManager& io, const DEMObject &dem, const Grid2DObject &landuse, const std::vector<Coords> &vec_pts, SnowDriftA3D*& drift, EnergyBalance*& eb, SnowpackInterface*& snowpack, DataAssimilation*& da, Runoff*& runoff)
+inline void setModules(const Config &cfg, IOManager& io, const DEMObject &dem, const Grid2DObject &landuse, const std::vector<Coords> &vec_pts, const std::vector<std::vector<double> > &pv_pts, SnowDriftA3D*& drift, EnergyBalance*& eb, SnowpackInterface*& snowpack, DataAssimilation*& da, Runoff*& runoff)
 {
 	const bool isMaster = MPIControl::instance().master(); // Check if this process is the master (always true for non-parallel mode)
 	
 	//EBALANCE
 	if (enable_eb && !nocompute) {
 		try {
-			eb = new EnergyBalance(npebalance, cfg, dem);
+			eb = new EnergyBalance(npebalance, cfg, dem, pv_pts);
 		} catch(std::exception& e) {
 			std::cout << "[E] Exception in EnergyBalance constructor\n";
 			cout << e.what() << endl;
@@ -396,6 +419,9 @@ inline void real_main(int argc, char **argv)
 	DEMObject dem;
 	Grid2DObject landuse;
 	std::vector<Coords> vec_pts;
+
+	//FELIX:
+	std::vector<std::vector<double> > pv_pts;
 	
 	//make sure that if the sno files are not written out, they will still be available for the POI
 	const std::string meteo_outpath = cfg.get("METEOPATH", "Output");
@@ -406,8 +432,10 @@ inline void real_main(int argc, char **argv)
 	cfg.write(meteo_outpath + "/io.ini"); //backup the ini file
 
 	try { //main integration loop
-		setStaticData(cfg, io, dem, landuse, vec_pts);
-		setModules(cfg, io, dem, landuse, vec_pts, drift, eb, snowpack, da, runoff);
+		//setStaticData(cfg, io, dem, landuse, vec_pts);
+		//FELIX:
+		setStaticData(cfg, io, dem, landuse, vec_pts, pv_pts);
+		setModules(cfg, io, dem, landuse, vec_pts, pv_pts, drift, eb, snowpack, da, runoff);
 		AlpineControl control(snowpack, drift, eb, da, runoff, cfg, dem);
 		control.setNoCompute(nocompute);
 		control.Run(startdate, steps);

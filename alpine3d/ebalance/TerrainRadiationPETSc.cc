@@ -115,8 +115,7 @@ TerrainRadiationPETSc::~TerrainRadiationPETSc()
 }
 
 
-void TerrainRadiationPETSc::getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse,
-                                         const mio::Array2D<double>& direct_unshaded_horizontal, mio::Array2D<double>& terrain)
+void TerrainRadiationPETSc::getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse, mio::Array2D<double>& terrain, mio::Array2D<double>& direct_unshaded_horizontal)
 {
 	Array2D<double> Qin_raw(dimx,dimy,0);
 	Qin_raw += diffuse;

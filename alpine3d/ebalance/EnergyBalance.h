@@ -23,8 +23,10 @@
 
 class SnowpackInterface;
 
+#include <alpine3d/MPIControl.h>
 #include <alpine3d/ebalance/RadiationField.h>
 #include <alpine3d/ebalance/TerrainRadiationAlgorithm.h>
+#include <alpine3d/ebalance/SolarPanel.h>
 #include <alpine3d/SnowpackInterface.h>
 
 /**
@@ -68,7 +70,7 @@ class SnowpackInterface;
 class EnergyBalance
 {
 	public:
-		EnergyBalance( const unsigned int& i_nbworkers, const mio::Config& cfg, const mio::DEMObject &dem_in);
+		EnergyBalance( const unsigned int& i_nbworkers, const mio::Config& cfg, const mio::DEMObject &dem_in, const std::vector<std::vector<double> > &pv_pts);
 		EnergyBalance(const EnergyBalance&);
 		~EnergyBalance( );
 
@@ -79,6 +81,10 @@ class EnergyBalance
 
 		void setMeteo(const mio::Grid2DObject& in_ilwr,
 		              const mio::Grid2DObject& in_ta, const mio::Grid2DObject& in_rh, const mio::Grid2DObject& in_p, const mio::Date timestamp);
+
+		//FELIX
+		void setPVP(const mio::Date timestamp);
+		void writeSumPVP(const unsigned int max_steps);
 
 		void setStations(const std::vector<mio::MeteoData>& in_vecMeteo);
 		double getTiming() const;
@@ -92,9 +98,12 @@ class EnergyBalance
 		mio::DEMObject dem;
 		std::vector<mio::MeteoData> vecMeteo;
 		mio::Grid2DObject albedo;
-		mio::Array2D<double> direct, diffuse, reflected, direct_unshaded_horizontal;
+		mio::Array2D<double> direct_unshaded_horizontal, direct, diffuse, reflected; //FELIX: direct_unshaded_horizontal
 		mio::Timer timer;
-
+		std::vector<std::vector<double> > pv_points;
+		//FELIX
+		SolarPanel *PVP;
+		const mio::Config& cfg;
 		size_t dimx, dimy;
 		unsigned int nbworkers;
 };

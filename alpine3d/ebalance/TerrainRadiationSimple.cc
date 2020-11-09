@@ -21,9 +21,9 @@
 using namespace mio;
 
 TerrainRadiationSimple::TerrainRadiationSimple(const mio::DEMObject& dem_in, const std::string& method)
-                      : TerrainRadiationAlgorithm(method),
-                        albedo_grid(dem_in.getNx(), dem_in.getNy(), IOUtils::nodata), sky_vf(dem_in.getNx(), dem_in.getNy(), IOUtils::nodata),
-                        dimx(dem_in.getNx()), dimy(dem_in.getNy()), startx(0), endx(dimx)
+					  : TerrainRadiationAlgorithm(method),
+						albedo_grid(dem_in.getNx(), dem_in.getNy(), IOUtils::nodata), sky_vf(dem_in.getNx(), dem_in.getNy(), IOUtils::nodata),
+						dimx(dem_in.getNx()), dimy(dem_in.getNy()), startx(0), endx(dimx)
 {
 	// In case we're running with MPI enabled, calculate the slice this process is responsible for
 	size_t nx = dimx;
@@ -35,8 +35,7 @@ TerrainRadiationSimple::TerrainRadiationSimple(const mio::DEMObject& dem_in, con
 
 TerrainRadiationSimple::~TerrainRadiationSimple() {}
 
-void TerrainRadiationSimple::getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse,
-                                          const mio::Array2D<double>& direct_unshaded_horizontal, mio::Array2D<double>& terrain)
+void TerrainRadiationSimple::getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse, mio::Array2D<double>& terrain, mio::Array2D<double>& direct_unshaded_horizontal)
 {
 	MPIControl& mpicontrol = MPIControl::instance();
 	terrain.resize(dimx, dimy, 0.);  //so allreduce_sum works properly when it sums full grids
@@ -55,7 +54,7 @@ void TerrainRadiationSimple::getRadiation(const mio::Array2D<double>& direct, mi
 				terrain(ii,jj) = IOUtils::nodata;
 				diff_corr(ii,jj) = IOUtils::nodata;
 			} else {
-				const double terrain_reflected = getAlbedo(ii,jj) * (direct_unshaded_horizontal(ii,jj)+diffuse(ii,jj)); //TODO take direct_h instead
+				const double terrain_reflected = getAlbedo(ii,jj) * (direct_unshaded_horizontal(ii,jj)+diffuse(ii,jj));
 				const double terrain_viewFactor = 1. - sky_vf(ii,jj);
 				terrain(ii,jj) = terrain_viewFactor * terrain_reflected;
 				diff_corr(ii,jj) = diffuse(ii,jj) * sky_vf(ii,jj);

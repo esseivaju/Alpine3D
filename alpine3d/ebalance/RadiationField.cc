@@ -137,7 +137,8 @@ void RadiationField::setMeteo(const mio::Grid2DObject& in_ta, const mio::Grid2DO
 	direct.set(in_ta, 0.); //reset to a band size (the "night" case might have set to the full dem)
 	diffuse.set(in_ta, 0.); //reset to a band size (the "night" case might have set to the full dem)
 
-  direct_unshaded_horizontal.set(in_ta, 0.);
+	//FELIX
+	direct_unshaded_horizontal.set(in_ta, 0.);
 
 	if (night) return; //no iswr at night
 
@@ -157,16 +158,15 @@ void RadiationField::setMeteo(const mio::Grid2DObject& in_ta, const mio::Grid2DO
 			if (in_albedo(i_band,jj)==mio::IOUtils::nodata || dem(i_dem,jj)==mio::IOUtils::nodata) {
 				diffuse(i_band,jj) = mio::IOUtils::nodata;
 				direct(i_band,jj) = mio::IOUtils::nodata;
-        direct_unshaded_horizontal(i_band,jj) = mio::IOUtils::nodata; //<-FELIX
-
+				direct_unshaded_horizontal(i_band,jj) = mio::IOUtils::nodata; //<-FELIX
 				continue;
 			}
 
 			Sun.resetAltitude( dem(i_dem, jj) );
 			Sun.calculateRadiation(in_ta(i_band,jj), in_rh(i_band,jj), in_p(i_band,jj), in_albedo(i_band,jj));
 			double cell_toa, cell_direct, cell_diffuse;
-      double cell_direct_unshaded_horizontal=0; //<-Felix
 
+			double cell_direct_unshaded_horizontal=0; //<-Felix
 			Sun.getHorizontalRadiation(cell_toa, cell_direct, cell_diffuse);
 
 			if (day) {
@@ -183,7 +183,7 @@ void RadiationField::setMeteo(const mio::Grid2DObject& in_ta, const mio::Grid2DO
 					cell_direct = global*(1.-Md(i_band, jj));
 					cell_direct = mio::SunTrajectory::projectHorizontalToSlope( solarAzimuth, solarElevation, slope_azi, slope_angle, cell_direct );
 				}
-        cell_direct_unshaded_horizontal=global*(1.-Md(i_band, jj)); //<-FELIX
+				cell_direct_unshaded_horizontal=global*(1.-Md(i_band, jj)); //<-FELIX
 
 			} else { //this is either dawn or dusk
 				cell_diffuse += cell_direct;
@@ -192,7 +192,7 @@ void RadiationField::setMeteo(const mio::Grid2DObject& in_ta, const mio::Grid2DO
 
 			diffuse(i_band,jj) = corr_glob(i_band, jj)*cell_diffuse;
 			direct(i_band,jj) = corr_glob(i_band, jj)*cell_direct;
-      direct_unshaded_horizontal(i_band,jj) = corr_glob(i_band, jj)*cell_direct_unshaded_horizontal; //<-FELIX
+			direct_unshaded_horizontal(i_band,jj) = corr_glob(i_band, jj)*cell_direct_unshaded_horizontal; //<-FELIX
 
 		}
 	}
@@ -212,10 +212,9 @@ void RadiationField::getBandOffsets(size_t& o_startx, size_t& o_stopx) const
 	o_stopx = band_dimx;
 }
 
-void RadiationField::getRadiation(mio::Array2D<double>& o_direct, mio::Array2D<double>& o_diffuse,
-                                  mio::Array2D<double>& o_direct_unshaded_horizontal) const
+void RadiationField::getRadiation(mio::Array2D<double>& o_direct, mio::Array2D<double>& o_diffuse, mio::Array2D<double>& o_direct_unshaded_horizontal) const
 {
 	o_direct = direct.grid2D;
 	o_diffuse = diffuse.grid2D;
-  o_direct_unshaded_horizontal = direct_unshaded_horizontal.grid2D;
+	o_direct_unshaded_horizontal = direct_unshaded_horizontal.grid2D;
 }

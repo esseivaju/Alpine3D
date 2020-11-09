@@ -22,11 +22,13 @@
 using namespace mio;
 using namespace std;
 
-EnergyBalance::EnergyBalance(const unsigned int& i_nbworkers, const mio::Config& cfg, const mio::DEMObject &dem_in)
+// FELIX: added pv_pts, pv_points
+EnergyBalance::EnergyBalance(const unsigned int& i_nbworkers, const mio::Config& cfg_in, const mio::DEMObject &dem_in, const std::vector<std::vector<double> > &pv_pts)
               : snowpack(NULL), terrain_radiation(NULL), radfields(i_nbworkers), dem(dem_in), vecMeteo(),
-                albedo(dem_in, 0.), direct(), diffuse(), reflected(), direct_unshaded_horizontal(),
-                timer(), dimx(dem_in.getNx()), dimy(dem_in.getNy()), nbworkers(i_nbworkers)
-{
+                albedo(dem_in, 0.), direct_unshaded_horizontal(), direct(), diffuse(), reflected(),
+                timer(), dimx(dem_in.getNx()), dimy(dem_in.getNy()), nbworkers(i_nbworkers), pv_points(pv_pts), cfg(cfg_in)
+{	
+
 	MPIControl& instance = MPIControl::instance();
 
 	size_t startx = 0, nx = dimx;
@@ -46,11 +48,17 @@ EnergyBalance::EnergyBalance(const unsigned int& i_nbworkers, const mio::Config&
 	if (instance.master())
 		std::cout << "[i] EnergyBalance initialized a total of " << instance.size() << " process(es) with " << nbworkers << " worker(s) each\n";
 
+	// FELIX
+        if (cfg.keyExists("PVP", "Input"))
+        {
+            if(cfg.get("Terrain_Radiation", "EBalance")) PVP= new SolarPanel(cfg, dem, pv_points, radfields[0]);
+        }
+
+
 	// Every MPI process will have its own copy of terrain_radiation object with full DEM
 	const bool enable_terrain_radiation = cfg.get("Terrain_Radiation", "EBalance");
 	if (enable_terrain_radiation) {
-		terrain_radiation = TerrainRadiationFactory::getAlgorithm(cfg, dem, nbworkers);
-
+		terrain_radiation = TerrainRadiationFactory::getAlgorithm(cfg, dem, nbworkers, radfields[0], PVP); 	// FELIX:  radfields[0]
 		const std::string algo = terrain_radiation->algo;
 		if (instance.master())
 			std::cout << "[i] Using terrain radiation with model: " << algo << "\n";
@@ -72,7 +80,7 @@ EnergyBalance& EnergyBalance::operator=(const EnergyBalance& source) {
 		direct = source.direct;
 		diffuse = source.diffuse;
 		reflected = source.reflected;
-    direct_unshaded_horizontal = source.reflected;
+		direct_unshaded_horizontal = source.reflected;
 		timer = source.timer;
 		dimx = source.dimx;
 		dimy = source.dimy;
@@ -108,20 +116,20 @@ void EnergyBalance::setAlbedo(const mio::Grid2DObject& in_albedo)
 {
 	albedo = in_albedo;
 
+	direct_unshaded_horizontal.resize(0, 0); //FELIX
 	direct.resize(0, 0); //resetting these grids that are not valid anymore
 	diffuse.resize(0, 0);
 	reflected.resize(0, 0);
-  direct_unshaded_horizontal.resize(0,0);
 }
 
 void EnergyBalance::setStations(const std::vector<mio::MeteoData>& in_vecMeteo)
 {
 	vecMeteo = in_vecMeteo;
 
+	direct_unshaded_horizontal.resize(0, 0); //FELIX
 	direct.resize(0, 0); //resetting these grids that are not valid anymore
 	diffuse.resize(0, 0);
 	reflected.resize(0, 0);
-  direct_unshaded_horizontal.resize(0,0);
 }
 
 void EnergyBalance::setMeteo(const mio::Grid2DObject& in_ilwr,
@@ -130,7 +138,7 @@ void EnergyBalance::setMeteo(const mio::Grid2DObject& in_ilwr,
 	timer.restart();
 	direct.resize(dimx, dimy);
 	diffuse.resize(dimx, dimy);
-  direct_unshaded_horizontal.resize(dimx,dimy);
+	direct_unshaded_horizontal.resize(dimx, dimy);
 
 	#pragma omp parallel for schedule(dynamic)
 	for (size_t ii=0; ii<nbworkers; ii++) {
@@ -142,18 +150,27 @@ void EnergyBalance::setMeteo(const mio::Grid2DObject& in_ilwr,
 		                       mio::Grid2DObject(in_p, startx, 0, nx, dimy),
 		                       mio::Grid2DObject(albedo, startx, 0, nx, dimy));
 
-		mio::Array2D<double> band_direct, band_diffuse;
-		radfields[ii]->getRadiation(band_direct, band_diffuse,direct_unshaded_horizontal);
+		mio::Array2D<double> band_direct, band_diffuse, band_direct_unshaded_horizontal;
+		radfields[ii]->getRadiation(band_direct, band_diffuse, band_direct_unshaded_horizontal);
 		direct.fill(band_direct, startx, 0, nx, dimy);
 		diffuse.fill(band_diffuse, startx, 0, nx, dimy);
+		direct_unshaded_horizontal.fill(band_direct_unshaded_horizontal, startx, 0, nx, dimy);
 	}
 	MPIControl::instance().allreduce_sum(direct);
 	MPIControl::instance().allreduce_sum(diffuse);
+	MPIControl::instance().allreduce_sum(direct_unshaded_horizontal);
+
+
+	// FELIX
+	if (cfg.keyExists("PVP", "Input"))
+	{
+		PVP->setGridRadiation(albedo, direct, diffuse, direct_unshaded_horizontal);
+	}
 
 	if (terrain_radiation) {
 		// note: parallelization has to take place inside the TerrainRadiationAlgorithm implementations
 		terrain_radiation->setMeteo(albedo.grid2D, in_ta.grid2D, in_rh.grid2D, in_ilwr.grid2D);
-		terrain_radiation->getRadiation(direct, diffuse, direct_unshaded_horizontal, reflected);
+		terrain_radiation->getRadiation(direct, diffuse, reflected, direct_unshaded_horizontal);
 	}
 
 	if (MPIControl::instance().master())
@@ -178,6 +195,16 @@ void EnergyBalance::setMeteo(const mio::Grid2DObject& in_ilwr,
 		}
 	}
 	timer.stop();
+}
+
+void EnergyBalance::setPVP(const mio::Date timestamp){
+	
+	if (cfg.keyExists("PVP", "Input")) PVP->setPVP(timestamp);
+}
+
+void EnergyBalance::writeSumPVP(const unsigned int max_steps){
+	
+	if (cfg.keyExists("PVP", "Input")) PVP->writeSumPVP(max_steps);
 }
 
 double EnergyBalance::getTiming() const
