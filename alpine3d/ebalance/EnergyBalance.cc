@@ -26,7 +26,7 @@ using namespace std;
 EnergyBalance::EnergyBalance(const unsigned int& i_nbworkers, const mio::Config& cfg_in, const mio::DEMObject &dem_in, const std::vector<std::vector<double> > &pv_pts)
               : snowpack(NULL), terrain_radiation(NULL), radfields(i_nbworkers), dem(dem_in), vecMeteo(),
                 albedo(dem_in, 0.), direct_unshaded_horizontal(), direct(), diffuse(), reflected(),
-                timer(), dimx(dem_in.getNx()), dimy(dem_in.getNy()), nbworkers(i_nbworkers), pv_points(pv_pts), cfg(cfg_in)
+                timer(), dimx(dem_in.getNx()), dimy(dem_in.getNy()), nbworkers(i_nbworkers), pv_points(pv_pts), PVP(nullptr), cfg(cfg_in)
 {	
 
 	MPIControl& instance = MPIControl::instance();
@@ -104,6 +104,10 @@ void EnergyBalance::Destroy()
 	if (terrain_radiation) {
 		delete terrain_radiation;
 		terrain_radiation = NULL;
+	}
+	if (PVP) {
+		delete PVP;
+		PVP = nullptr;
 	}
 }
 
