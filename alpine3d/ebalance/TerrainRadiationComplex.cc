@@ -69,7 +69,7 @@ TerrainRadiationComplex::TerrainRadiationComplex(const mio::Config& cfg_in, cons
 	initSortList();
 
 	if (if_write_view_list) WriteViewList();									// Write ViewList to file
-	if (cfg.keyExists("PVP", "Input")) PVobject->initTerrain(M_epsilon, M_phi);	// Link SolarPanel-object to ViewList
+	if (cfg.keyExists("PVPFILE", "EBalance")) PVobject->initTerrain(M_epsilon, M_phi);	// Link SolarPanel-object to ViewList
 	
 }
 
@@ -713,7 +713,7 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double>& direct, m
 
 						Rad_solidangle=Rad_solidangle*albedo_temp/S;
 							
-						if(!cfg.keyExists("PVP", "Input")) continue;
+						if(!cfg.keyExists("PVPFILE", "EBalance")) continue;
 
 						if (albedo_temp<0.5 || !if_anisotropy){
 							for (size_t solidangle_out = 0; solidangle_out < S; ++solidangle_out)
@@ -734,7 +734,7 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double>& direct, m
 	}
 
 	// If SolarPanel-module is used, send all needed data
-	if(cfg.keyExists("PVP", "Input")) PVobject->setTLists(TList_direct, TList_sky_iso, TList_sky_aniso, TList_ms_new+TList_sky_aniso);
+	if(cfg.keyExists("PVPFILE", "EBalance")) PVobject->setTLists(TList_direct, TList_sky_iso, TList_sky_aniso, TList_ms_new+TList_sky_aniso);
 
 	// Average both triangles to one DEM-Gridpoint-Value for further Alpine3D use
 	#pragma omp parallel for

@@ -49,7 +49,7 @@ EnergyBalance::EnergyBalance(const unsigned int& i_nbworkers, const mio::Config&
 		std::cout << "[i] EnergyBalance initialized a total of " << instance.size() << " process(es) with " << nbworkers << " worker(s) each\n";
 
 	// FELIX
-	if (cfg.keyExists("PVP", "Input"))
+	if (cfg.keyExists("PVPFILE", "EBalance"))
 	{
 		//load PVP data
 		readPVP();
@@ -191,7 +191,7 @@ void EnergyBalance::setMeteo(const mio::Grid2DObject& in_ilwr,
 
 
 	// FELIX
-	if (cfg.keyExists("PVP", "Input"))
+	if (cfg.keyExists("PVPFILE", "EBalance"))
 	{
 		PVP->setGridRadiation(albedo, direct, diffuse, direct_unshaded_horizontal);
 	}
@@ -228,17 +228,17 @@ void EnergyBalance::setMeteo(const mio::Grid2DObject& in_ilwr,
 
 void EnergyBalance::setPVP(const mio::Date timestamp){
 	
-	if (cfg.keyExists("PVP", "Input")) PVP->setPVP(timestamp);
+	if (cfg.keyExists("PVPFILE", "EBalance")) PVP->setPVP(timestamp);
 }
 
 void EnergyBalance::writeSumPVP(const unsigned int max_steps){
 	
-	if (cfg.keyExists("PVP", "Input")) PVP->writeSumPVP(max_steps);
+	if (cfg.keyExists("PVPFILE", "EBalance")) PVP->writeSumPVP(max_steps);
 }
 
 void EnergyBalance::readPVP()
 {
-	const std::string filename = cfg.get("PVPFILE", "Input");
+	const std::string filename = cfg.get("PVPFILE", "EBalance");
 	if (!FileUtils::fileExists(filename))
 	{
 		throw NotFoundException(filename, AT);
