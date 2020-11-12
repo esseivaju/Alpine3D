@@ -37,7 +37,7 @@ void SnowBRDF::initialize(const mio::Config& cfg){
 	for (unsigned i = 1; i < n_thi+1; ++i)
 	{
 		std::string path;
-		cfg.getValue("BRDFPATH", "INPUT", path);
+		cfg.getValue("BRDFPATH", "EBalance", path);
 		std::string mid="/weighted_cos=";
 		char theta[3];
 		sprintf(theta, "%d", 3*i);
