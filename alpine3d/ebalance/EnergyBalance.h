@@ -69,7 +69,7 @@ class SnowpackInterface;
 class EnergyBalance
 {
 	public:
-		EnergyBalance( const unsigned int& i_nbworkers, const mio::Config& cfg, const mio::DEMObject &dem_in, const std::vector<std::vector<double> > &pv_pts);
+		EnergyBalance( const unsigned int& i_nbworkers, const mio::Config& cfg, const mio::DEMObject &dem_in);
 		EnergyBalance(const EnergyBalance&);
 		~EnergyBalance( );
 
@@ -84,6 +84,7 @@ class EnergyBalance
 		//FELIX
 		void setPVP(const mio::Date timestamp);
 		void writeSumPVP(const unsigned int max_steps);
+		void readPVP();
 
 		void setStations(const std::vector<mio::MeteoData>& in_vecMeteo);
 		double getTiming() const;
