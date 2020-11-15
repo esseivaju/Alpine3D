@@ -3,7 +3,7 @@ PARALLEL=OPENMP
 NCORES=16
 
 BEGIN="2017-09-01T02:00"
-END="2017-09-01T18:00"
+END="2018-08-31T23:00"
 # "2018-08-31T23:00"
 PROG_ROOTDIR=~/usr/bin	#if you do not want to use Alpine3D from PATH, then point to where it is
 
