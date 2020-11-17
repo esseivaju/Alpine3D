@@ -67,6 +67,9 @@ class SnGrids {
                                           GLACIER, ///< mask showing the glaciated pixels
                                           GLACIER_EXPOSED, ///< mask showing the exposed glaciated pixels (ie not snow covered)
                                           ET, ///< Evapotranspiration
+                                          ISWR_TERRAIN, ///< Short wave received by terrain reflection
+                                          ILWR_TERRAIN, ///< Long wave received by terrain emission
+                                          VIEW_FACTOR, ///< Sky view factor
                                           TSOIL1, TSOIL2, TSOIL3, TSOIL4, TSOIL5, ///< Temperature within the soil, at a given depth
                                           lastparam=TSOIL5};
 

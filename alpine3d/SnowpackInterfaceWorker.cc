@@ -397,6 +397,10 @@ void SnowpackInterfaceWorker::fillGrids(const size_t& ii, const size_t& jj, cons
 					// Add part from Canopy
 					value += useCanopy?(snowPixel.Cdata.transp+snowPixel.Cdata.intevap)/snowPixel.cos_sl:0; //slope2horiz
 					break;
+      case SnGrids::ISWR_TERRAIN:
+      case SnGrids::ILWR_TERRAIN:
+      case SnGrids::VIEW_FACTOR:
+          break;
 			default:
 				if (it->first>=SnGrids::TSOIL1 && it->first<=SnGrids::lastparam) //dealing with soil temperatures
 				{
