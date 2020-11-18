@@ -27,7 +27,7 @@ EnergyBalance::EnergyBalance(const unsigned int& i_nbworkers, const mio::Config&
               : snowpack(NULL), terrain_radiation(NULL), radfields(i_nbworkers), dem(dem_in), vecMeteo(),
                 albedo(dem_in, 0.), direct_unshaded_horizontal(), direct(), diffuse(), reflected(),
                 timer(), dimx(dem_in.getNx()), dimy(dem_in.getNy()), nbworkers(i_nbworkers), pv_points(), PVP(nullptr), cfg(cfg_in)
-{	
+{
 
 	MPIControl& instance = MPIControl::instance();
 
@@ -196,10 +196,11 @@ void EnergyBalance::setMeteo(const mio::Grid2DObject& in_ilwr,
 		PVP->setGridRadiation(albedo, direct, diffuse, direct_unshaded_horizontal);
 	}
 
+  mio::Array2D<double> view_factor(dimx, dimy, IOUtils::nodata);
 	if (terrain_radiation) {
 		// note: parallelization has to take place inside the TerrainRadiationAlgorithm implementations
 		terrain_radiation->setMeteo(albedo.grid2D, in_ta.grid2D, in_rh.grid2D, in_ilwr.grid2D);
-		terrain_radiation->getRadiation(direct, diffuse, reflected, direct_unshaded_horizontal);
+		terrain_radiation->getRadiation(direct, diffuse, reflected, direct_unshaded_horizontal,view_factor);
 	}
 
 	if (MPIControl::instance().master())
@@ -216,7 +217,8 @@ void EnergyBalance::setMeteo(const mio::Grid2DObject& in_ilwr,
 
 		timer.stop();
 		try {
-			snowpack->setRadiationComponents(global, ilwr, diffuse, solarElevation, timestamp); //this triggers Snowpack calculation
+			snowpack->setRadiationComponents(global, ilwr, diffuse, view_factor, reflected,
+                                       in_ilwr.grid2D,  solarElevation, timestamp); //this triggers Snowpack calculation
 		} catch(std::exception& e) {
 			std::cout << "[E] Exception in snowpack->setRadiationComponents()\n";
 			cout << e.what() << endl;
@@ -227,12 +229,12 @@ void EnergyBalance::setMeteo(const mio::Grid2DObject& in_ilwr,
 }
 
 void EnergyBalance::setPVP(const mio::Date timestamp){
-	
+
 	if (cfg.keyExists("PVPFILE", "EBalance")) PVP->setPVP(timestamp);
 }
 
 void EnergyBalance::writeSumPVP(const unsigned int max_steps){
-	
+
 	if (cfg.keyExists("PVPFILE", "EBalance")) PVP->writeSumPVP(max_steps);
 }
 

@@ -76,7 +76,8 @@ class TerrainRadiationHelbig: public TerrainRadiationAlgorithm {
 	public:
 		TerrainRadiationHelbig(const mio::Config& i_cfg, const mio::DEMObject& dem_in, const int& i_nbworkers, const std::string& method);
 
-		void getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse, mio::Array2D<double>& terrain, mio::Array2D<double>& direct_unshaded_horizontal);
+		void getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse, mio::Array2D<double>& terrain,
+                      mio::Array2D<double>& direct_unshaded_horizontal, mio::Array2D<double>& view_factor);
 		void setMeteo(const mio::Array2D<double>& albedo, const mio::Array2D<double>& ta,
 		              const mio::Array2D<double>& rh, const mio::Array2D<double>& ilwr);
 
@@ -132,6 +133,7 @@ class TerrainRadiationHelbig: public TerrainRadiationAlgorithm {
 		void fillSWResultsGrids(const bool& day);
 
 		void InitializeLW (const int i, const int j);
+    void getSkyViewFactor(mio::Array2D<double> &o_sky_vf);
 
 		static inline void CalculateIndex(const int indice, const int distance_max, int dim, int * min, int * max);
 		static inline void LWTerrainRadiationCore(const double bx2, const int j_shoot, const double z_shoot, const int j, const double z, const double cellsize, const double t_snow_shoot,const double t_snow_shoot_value ,const double t_a, const double vf, double * lwi, int * s);

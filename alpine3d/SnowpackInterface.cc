@@ -684,6 +684,8 @@ void SnowpackInterface::setMeteo(const Grid2DObject& new_psum, const Grid2DObjec
  */
 void SnowpackInterface::setRadiationComponents(const mio::Array2D<double>& shortwave_in,
      const mio::Array2D<double>& longwave_in, const mio::Array2D<double>& diff_in,
+     const mio::Array2D<double>& view_factor_in, const mio::Array2D<double>& terrain_shortwave_in,
+     const mio::Array2D<double>& terrain_longwave_in,
      const double& solarElevation_in, const mio::Date& timestamp)
 {
 	if (nextStepTimestamp != timestamp) {
@@ -697,6 +699,10 @@ void SnowpackInterface::setRadiationComponents(const mio::Array2D<double>& short
 	shortwave.grid2D = shortwave_in;
 	longwave.grid2D = longwave_in;
 	diffuse.grid2D = diff_in;
+  view_factor.grid2D = view_factor_in;
+  terrain_shortwave.grid2D = terrain_shortwave_in;
+  terrain_longwave.grid2D = terrain_longwave_in;
+
 	solarElevation = solarElevation_in;
 
 	dataRadiation = true;
@@ -735,9 +741,9 @@ mio::Grid2DObject SnowpackInterface::getGrid(const SnGrids::Parameters& param) c
     case SnGrids::ISWR_TERRAIN:
       return terrain_shortwave;
     case SnGrids::ILWR_TERRAIN:
-      return terrain_shortwave;
-    case SnGrids::VIEW_FACTOR:
       return terrain_longwave;
+    case SnGrids::VIEW_FACTOR:
+      return view_factor;
 		default: ; //so compilers do not complain about missing conditions
 	}
 

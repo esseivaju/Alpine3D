@@ -159,6 +159,9 @@ class Runoff; // forward declaration, cyclic header include
 		void setRadiationComponents(const mio::Array2D<double>& shortw,
 		                            const mio::Array2D<double>& longwave,
 		                            const mio::Array2D<double>& diff,
+                                const mio::Array2D<double>& view_factor_in,
+                                const mio::Array2D<double>& terrain_shortwave_in,
+                                const mio::Array2D<double>& terrain_longwave_in,
 		                            const double& solarElevation,
 		                            const mio::Date& timestamp);
 
