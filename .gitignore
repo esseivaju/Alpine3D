@@ -1,0 +1,15 @@
+doc/examples/*/output/*
+CMakeCache.txt
+CMakeDoxyfile.in
+CMakeDoxygenDefaults.cmake
+CMakeFiles/
+CPackConfig.cmake
+CPackSourceConfig.cmake
+Makefile
+alpine3d/CMakeFiles/
+alpine3d/Makefile
+alpine3d/cmake_install.cmake
+bin/
+cmake_install.cmake
+cmake_uninstall.cmake
+*.log
