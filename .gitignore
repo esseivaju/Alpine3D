@@ -13,3 +13,5 @@ bin/
 cmake_install.cmake
 cmake_uninstall.cmake
 *.log
+install_manifest.txt
+lib/*
