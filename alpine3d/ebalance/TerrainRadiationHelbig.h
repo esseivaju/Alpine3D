@@ -105,7 +105,7 @@ class TerrainRadiationHelbig: public TerrainRadiationAlgorithm {
 		double itEps_LW;
 		double max_alb;              // max ground albedo
 
-		mio::Array2D<double> total_diff, tdir, tdiff, sw_t, glob_start, glob_h_isovf, glob_h, t_snowold;
+		mio::Array2D<double> total_diff, tdir, tdiff, sw_t, glob_start, glob_h_isovf, glob_h, t_snowold, total_terrain;
 		//SnowpackInterface *snowpack;
 
 		double lw_start_l1;
@@ -123,13 +123,13 @@ class TerrainRadiationHelbig: public TerrainRadiationAlgorithm {
 		std::vector<CellsList> lwt_byCell;
 
 		void Compute();
-		int SWTerrainRadiationStep(const double threshold_itEps_SW, int *c, int *d, unsigned int n, const clock_t t0);
+		int SWTerrainRadiationStep(const double threshold_itEps_SW, int &c, int &d, unsigned int n, const clock_t t0);
 		int LWTerrainRadiationStep(const double threshold_itEps_LW, const int itMax_LW, const int i_shoot, const int j_shoot, unsigned int n, const clock_t t0);
-		int ComputeTerrainRadiation(const bool& day, int c, int d);
+		void ComputeTerrainRadiation(const bool& day, int i_max_unshoot, int j_max_unshoot );
 		void ComputeRadiationBalance();
-		void InitializeTerrainSwSplitting(const int& i, const int& j,
-		                                  int *i_max_unshoot, int *j_max_unshoot, double *diffmax_sw);
-		void InitializeTerrainRadiation(const bool& day, int *c, int *d);
+		void InitializeTerrainSwSplitting(const int i, const int j,
+		                                  int& i_max_unshoot, int& j_max_unshoot, double& diffmax_sw);
+		void InitializeTerrainRadiation(const bool& day, int& i_max_unshoot, int& j_max_unshoot);
 		void fillSWResultsGrids(const bool& day);
 
 		void InitializeLW (const int i, const int j);

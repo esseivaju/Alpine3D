@@ -45,6 +45,7 @@ TerrainRadiationHelbig::TerrainRadiationHelbig(const mio::Config& cfg, const mio
 	glob_h_isovf.resize( dimx, dimy );
 	glob_h.resize( dimx, dimy );
 	t_snowold.resize( dimx, dimy );
+  total_terrain.resize( dimx, dimy );
 
 	lw_t.resize( dimx, dimy );
 	lwi.resize( dimx, dimy );
@@ -61,7 +62,7 @@ void TerrainRadiationHelbig::getRadiation(const mio::Array2D<double>& direct, mi
 		tdir = direct;
 		tdiff = diffuse;
 		Compute();
-		terrain = total_diff;
+		terrain = total_terrain;
     getSkyViewFactor(view_factor);
 }
 
@@ -82,15 +83,12 @@ void TerrainRadiationHelbig::Compute()
 {	//we take sn_MdataT values as reference radiation values for all cells
 	//iswr_ref = sn_MdataT.iswr;
 	//ea_ref = sn_MdataT.ea;
-
 	//WORKAROUND
 	//ea_ref = 100;
-
-
 	//FillSurfaceData ( );
-
 	// the  distributed radiation  calculation
 	//double solarElevation;
+
 	ComputeRadiationBalance();
 
 	//sn_MdataT.elev = solarElevation; //needed for Canopy
@@ -98,12 +96,12 @@ void TerrainRadiationHelbig::Compute()
 	// corresponding snowpack data structure
 }
 
-int TerrainRadiationHelbig::SWTerrainRadiationStep(const double threshold_itEps_SW, int *c, int *d, unsigned int n, const clock_t t0)
+int TerrainRadiationHelbig::SWTerrainRadiationStep(const double threshold_itEps_SW, int& i_max_unshoot, int& j_max_unshoot, unsigned int n, const clock_t t0)
 {
 	// Computation of shortwave terrain radiation
 	// At every iteration step, a reference grid cell reflects ('shoots') radiation to every other grid cell
 	// The coordinates of the next cell with the most unshoot radiation is writen in (*c,*d)
-	const int i_shoot = *c, j_shoot = *d;	//variables for the grid cell with the most unshot radiation
+	const int i_shoot = i_max_unshoot, j_shoot = j_max_unshoot;	//variables for the grid cell with the most unshot radiation
 	double diffmax_sw=0.;		// reference product for detecting the grid cell with most unshot shortwave radiation
 	const double diffmax_thres=0.;	// threshold for when to stop looking for maximum cells
 	double eps_stern=0.;		// stopping criterion
@@ -142,9 +140,9 @@ int TerrainRadiationHelbig::SWTerrainRadiationStep(const double threshold_itEps_
 
 				// the received amount is added to the reflectable amount of radiation (unshot)
 				sw_t(i,j) += rad;
-
 				// in addition the received amount is added to the total radiation at ij
 				glob_h(i,j) += rad;
+        total_terrain(i,j) += rad;
 
 				s++;
 			} // end of if only for distances lower than sw_radius
@@ -155,8 +153,8 @@ int TerrainRadiationHelbig::SWTerrainRadiationStep(const double threshold_itEps_
 			if ( reflected_i_j  > diffmax_sw ) {
 				if (i!=i_shoot && j!=j_shoot) {
 					diffmax_sw = reflected_i_j;
-					*c = i;
-					*d = j;
+					i_max_unshoot = i;
+					j_max_unshoot = j;
 				}
 			}
 
@@ -177,8 +175,8 @@ int TerrainRadiationHelbig::SWTerrainRadiationStep(const double threshold_itEps_
 	// check for stopping the iteration
 	if ( eps_stern <= threshold_itEps_SW || be >= (itEps1_SW *
 		     ( mean_glob_start * dimx * dimy )) || diffmax_sw<=diffmax_thres) {
-		printf("day with PR: SW converged after n=%u steps eps_stern <= %2.10f be <= %2.10f with %u gathering steps\n", n, eps_stern, be, s);
-		printf(" time for SW %f seconds\n", (double)((clock() - t0)/CLOCKS_PER_SEC));
+		printf("[i] EBALANCE: SW converged after n=%u steps eps_stern <= %2.10f be <= %2.10f with %u gathering steps\n", n, eps_stern, be, s);
+		printf("    time for SW %f seconds\n", (double)((clock() - t0)/CLOCKS_PER_SEC));
 		fflush( stdout );
 		return 1;
 	}
@@ -361,7 +359,7 @@ int TerrainRadiationHelbig::LWTerrainRadiationStep(const double threshold_itEps_
 	return 0;
 }
 
-int TerrainRadiationHelbig::ComputeTerrainRadiation ( const bool& day, int c, int d)
+void TerrainRadiationHelbig::ComputeTerrainRadiation ( const bool& day, int i_max_unshoot, int j_max_unshoot )
 {
 // computes long wave and short wave terrain radiation using
 // a Progressive Refinement Radiosity (e.g. Gortler et al. (1994)
@@ -384,12 +382,10 @@ int TerrainRadiationHelbig::ComputeTerrainRadiation ( const bool& day, int c, in
 			converged = 1;
 		else
 			converged = 0;
-
 		// itEps_SW: SW radiosity stopping tolerance
 		// epsilon = itEps_SW * |unshot radiosity|_1 sum / faktor y
 		threshold_itEps_SW = itEps_SW * (mean_glob_start * dimx * dimy) * viewFactorsHelbigObj.min_area
-
-									* viewFactorsHelbigObj.min_vterr * (1. - max_alb) / max_alb;
+                          * viewFactorsHelbigObj.min_vterr * (1. - max_alb) / max_alb;
 
 		mio::Timer timer_sw;
 		timer_sw.start();
@@ -397,7 +393,7 @@ int TerrainRadiationHelbig::ComputeTerrainRadiation ( const bool& day, int c, in
 		std::cout << "converged: " << converged << std::endl;
 		while (converged != 1) {
 			n++;
-			converged = SWTerrainRadiationStep(threshold_itEps_SW, &c, &d, n, t0);
+			converged = SWTerrainRadiationStep(threshold_itEps_SW, i_max_unshoot, j_max_unshoot, n, t0);
 		}
 
 		timer_sw.stop();
@@ -413,15 +409,17 @@ int TerrainRadiationHelbig::ComputeTerrainRadiation ( const bool& day, int c, in
 	// grid cells per model domain
 	itMax_LW = dimx * dimy;
 
-	converged = 0;
-	n = 0;	// iteration step counter = shooting cell counter
-	while (converged != 1) {
-		n++;
-		converged = LWTerrainRadiationStep(threshold_itEps_LW, itMax_LW, lwt_byCell[n].x, lwt_byCell[n].y, n, t0);
-		lw_eps_stern -= fabs(lwt_byCell[n-1].radiation); //updating convergence criteria
-	}
 
-	return EXIT_SUCCESS;
+  //---> Block to uncomment to put back LW
+	//converged = 0;
+	//n = 0;	// iteration step counter = shooting cell counter
+	//while (converged != 1) {
+	//	n++;
+	//	converged = LWTerrainRadiationStep(threshold_itEps_LW, itMax_LW, lwt_byCell[n].x, lwt_byCell[n].y, n, t0);
+	//	lw_eps_stern -= fabs(lwt_byCell[n-1].radiation); //updating convergence criteria
+	//}
+
+
 } // end of ComputeTerrainRadiation
 
 
@@ -429,7 +427,7 @@ void TerrainRadiationHelbig::ComputeRadiationBalance ()
 { // This routine computes the distributed radiation balance
 	//double corr_dir;		// correction parameter for the distributed theoretical direct radiation
 	bool day;			// switch for daytime / nighttime
-	int c = 0, d = 0;		// variables for the grid cell with the most unshot shortwave radiation
+	int i_max_unshoot = 0, j_max_unshoot = 0;		// variables for the grid cell with the most unshot shortwave radiation
 	//double solarAzimuth;
 	//double toa_h, direct_h, diffuse;
 
@@ -449,23 +447,22 @@ void TerrainRadiationHelbig::ComputeRadiationBalance ()
 	// emittable longwave start distribution with vector norm l1
 	lw_start_l1 = 0.;
 
-	// calculation of the diffuse radiation from the terrain
-	InitializeTerrainRadiation(day, &c, &d);
-        ComputeTerrainRadiation( day, c, d );
+	// calculation of the reflected radiation from the terrain
+	InitializeTerrainRadiation(day, i_max_unshoot, j_max_unshoot);
+  ComputeTerrainRadiation( day, i_max_unshoot, j_max_unshoot );
 
 	fillSWResultsGrids(day);
 }
 
-void TerrainRadiationHelbig::InitializeTerrainSwSplitting(const int& i, const int& j,
-                                                 int *i_max_unshoot, int *j_max_unshoot, double *diffmax_sw)
-{//calculating incident direct swr for the grid point
-	double& direct=tdir(i,j); //currently, horizontal, we reproject to the slope
-	double& diffuse=tdiff(i,j);
+void TerrainRadiationHelbig::InitializeTerrainSwSplitting(const int i, const int j,
+                                                 int& i_max_unshoot, int& j_max_unshoot, double& diffmax_sw)
+{
 
-	diffuse = diffuse*viewFactorsHelbigObj.getSkyViewFactor(i,j); //no reprojection for diffuse rad
+  // Correct diffuse for sky VF
+	tdiff(i,j) = tdiff(i,j)*viewFactorsHelbigObj.getSkyViewFactor(i,j); //no reprojection for diffuse rad
 
 	// local *reflected* direct and diffuse sky radiation (later glob_h will include terrain reflected radiation)
-	glob_h(i,j) = albedo_grid(i,j) * (direct + diffuse); //HACK: despite its name, it is on the slope, not horizontal!
+	glob_h(i,j) = albedo_grid(i,j) * (tdir(i,j) + tdiff(i,j)); //HACK: despite its name, it is on the slope, not horizontal!
 
 	// storing the start shortwave radiation distribution
 	glob_start(i,j) = glob_h(i,j);
@@ -478,10 +475,10 @@ void TerrainRadiationHelbig::InitializeTerrainSwSplitting(const int& i, const in
 
 	// the grid cell with the most unshot radiation is selected taking into account albedo,
 	// actual (slope) area size, reflected shortwave radiation and sum of total terrain view factor
-	if ( sw_t(i,j) * viewFactorsHelbigObj.getSymetricTerrainViewFactor(i,j)  > *diffmax_sw ) {
-		*diffmax_sw = sw_t(i,j) * viewFactorsHelbigObj.getSymetricTerrainViewFactor(i,j);
-		*i_max_unshoot = i;
-		*j_max_unshoot = j;
+	if ( sw_t(i,j) * viewFactorsHelbigObj.getSymetricTerrainViewFactor(i,j)  > diffmax_sw ) {
+		diffmax_sw = sw_t(i,j) * viewFactorsHelbigObj.getSymetricTerrainViewFactor(i,j);
+		i_max_unshoot = i;
+		j_max_unshoot = j;
 	}
 
 	// lower bound for iteration start:
@@ -493,21 +490,23 @@ void TerrainRadiationHelbig::InitializeTerrainSwSplitting(const int& i, const in
 	}
 }
 
-void TerrainRadiationHelbig::InitializeTerrainRadiation(const bool& day, int *c, int *d)
+void TerrainRadiationHelbig::InitializeTerrainRadiation(const bool& day, int& i_max_unshoot, int& j_max_unshoot)
 {
 	double diffmax_sw = 0.; // reference product for detecting the grid cell with most unshot shortwave radiation
 	//int horizon_x, horizon_y; // corresponding horizon coordinates in solar azimuth direction
 
+  total_terrain.resize(dimx, dimy, 0);
 
 	lw_eps_stern = 0.; //Stop criterion for the LW terrain radiation
 
 	for ( int i = 0; i < dimx; i++ ) {
 		for ( int j = 0; j < dimy; j++ ) {
+      total_terrain(i,j) = 0;
 			if (dem.grid2D(i,j)==mio::IOUtils::nodata) continue;
 
 			if (day==true) { //then, compute short wave radiation
-				//set initial values for each cell for SW dir and diff
-				InitializeTerrainSwSplitting(i, j, c, d, &diffmax_sw);
+				//set initial values for each cell for SW diff (view caftor correction)
+				InitializeTerrainSwSplitting(i, j, i_max_unshoot, j_max_unshoot, diffmax_sw);
 			}
 			//compute long wave radiation
 			// saturation vapor pressure in Pa (routine in snowpack)
@@ -515,7 +514,8 @@ void TerrainRadiationHelbig::InitializeTerrainRadiation(const bool& day, int *c,
 			// wvp = water vapor pressure
 			//const double wvp = meteo2d_rh(i,j) * e_stern;
 			//Long Wave initialization
-			InitializeLW(i, j);
+
+			//InitializeLW(i, j); ---> TO PUT BACK ?
 		}
 	}
 
@@ -594,11 +594,11 @@ void TerrainRadiationHelbig::fillSWResultsGrids(const bool& day) {
 				// Fill in the return values for SNOWPACK or for the ebalance OUTPUT
 				// the INCIDENT global shortwave radiation:
 				if (albedo_grid(i,j) > 0)
-                                        glob_h(i,j) = glob_h(i,j) / albedo_grid(i,j); //HACK: this is BAD!
+          glob_h(i,j) = glob_h(i,j) / albedo_grid(i,j); //HACK: this is BAD!
 				// TOTAL incident shortwave diffuse radiation
 				//std::cout << tdiff(i,j) << " " << glob_h(i,j) << " " << glob_start(i,j) << " " << albedo_grid(i,j) << std::endl;
 				if (albedo_grid(i,j) > 0)
-                                        total_diff(i,j) = tdiff(i,j) + glob_h(i,j) - (glob_start(i,j) / albedo_grid(i,j));
+          total_diff(i,j) = tdiff(i,j) + glob_h(i,j) - (glob_start(i,j) / albedo_grid(i,j));
 			}
 		}
 	} else {
