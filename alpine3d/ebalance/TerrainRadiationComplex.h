@@ -18,14 +18,12 @@
 #ifndef TERRAINRadiationComplex_H
 #define TERRAINRadiationComplex_H
 
-
 #include <meteoio/MeteoIO.h>
 
 #include <alpine3d/ebalance/TerrainRadiationAlgorithm.h>
 #include <alpine3d/ebalance/RadiationField.h>
 #include <alpine3d/ebalance/SolarPanel.h>
 #include <alpine3d/ebalance/SnowBRDF.h>
-
 
 /**
  * @page TerrainRadiationComplex
@@ -63,84 +61,77 @@
  *
  */
 
+class TerrainRadiationComplex : public TerrainRadiationAlgorithm
+{
 
+public:
+	TerrainRadiationComplex(const mio::Config &cfg, const mio::DEMObject &dem_in, const std::string &method, const RadiationField *radfield, SolarPanel *PVobject_in);
+	~TerrainRadiationComplex();
 
-class TerrainRadiationComplex : public TerrainRadiationAlgorithm {
+	void getRadiation(const mio::Array2D<double> &direct, mio::Array2D<double> &diffuse, mio::Array2D<double> &terrain, mio::Array2D<double> &direct_unshaded_horizontal);
+	void setMeteo(const mio::Array2D<double> &albedo, const mio::Array2D<double> &ta, const mio::Array2D<double> &rh, const mio::Array2D<double> &ilwr);
 
-	public:
-		TerrainRadiationComplex(const mio::Config& cfg, const mio::DEMObject &dem_in, const std::string& method, const RadiationField* radfield, SolarPanel* PVobject_in);
-		~TerrainRadiationComplex();
+private:
+	// Initialisation Functions
+	void initBasicSetHorizontal();
+	void initBasicSetRotated();
+	void initViewList();
+	void initRList();
+	void initSortList();
+	void WriteViewList();
+	bool ReadViewList();
 
-		void getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse, mio::Array2D<double>& terrain, mio::Array2D<double>& direct_unshaded_horizontal);
-		void setMeteo(const mio::Array2D<double>& albedo, const mio::Array2D<double>& ta, const mio::Array2D<double>& rh,const mio::Array2D<double>& ilwr);
-		
+	// auxiliary functions
+	std::vector<double> TriangleNormal(size_t ii_dem, size_t jj_dem, int which_triangle);
+	double IntersectionRayTriangle(std::vector<double> ray, size_t ii_0, size_t jj_0, size_t ii_dem, size_t jj_dem, size_t which_triangle);
+	size_t vectorToSPixel(std::vector<double> vec_in, size_t ii_dem, size_t jj_dem, int which_triangle);
+	double getLandViewFactor(size_t ii_dem, size_t jj_dem, int which_triangle);
+	double getSkyViewFactor(size_t ii_dem, size_t jj_dem, int which_triangle);
+	std::vector<double> getVectorSun(double solarAzimuth, double solarElevation);
+	double TerrainBiggestDifference(mio::Array3D<double> terrain_old, mio::Array3D<double> terrain_new);
 
-	private:
+	// Standard Vector operations
+	double NormOfVector(std::vector<double> vec1);
+	std::vector<double> normalizeVector(std::vector<double> vec1);
+	double VectorScalarProduct(std::vector<double> vec1, std::vector<double> vec2);
+	std::vector<double> VectorCrossProduct(std::vector<double> vec1, std::vector<double> vec2);
+	std::vector<double> VectorSum(std::vector<double> vec1, std::vector<double> vec2);
+	std::vector<double> VectorDifference(std::vector<double> vec1, std::vector<double> vec2);
+	std::vector<double> VectorStretch(std::vector<double> vec1, double factor);
+	std::vector<double> RotN(std::vector<double> axis, std::vector<double> vec_in, double rad);
+	std::vector<double> ProjectVectorToPlane(std::vector<double> vec1, std::vector<double> plane_normal);
+	double AngleBetween2Vectors(std::vector<double> vec1, std::vector<double> vec2);
 
-		// Initialisation Functions
-		void initBasicSetHorizontal();
-		void initBasicSetRotated();
-		void initViewList();
-		void initRList();
-		void initSortList();
-		void WriteViewList();
-		bool ReadViewList();
+	// Output functions
+	void PrintProgress(double percentage);
 
+	// Variables
+	const size_t dimx, dimy;
+	size_t startx, endx;
+	mio::DEMObject dem;
+	const mio::Config &cfg;
 
-		// auxiliary functions
-		std::vector<double> TriangleNormal(size_t ii_dem, size_t jj_dem, int which_triangle);
-		double IntersectionRayTriangle(std::vector<double> ray, size_t ii_0, size_t jj_0, size_t ii_dem, size_t jj_dem, size_t which_triangle);
-		size_t vectorToSPixel(std::vector<double> vec_in, size_t ii_dem, size_t jj_dem, int which_triangle);
-		double getLandViewFactor(size_t ii_dem, size_t jj_dem, int which_triangle);
-		double getSkyViewFactor(size_t ii_dem, size_t jj_dem, int which_triangle);
-		std::vector<double> getVectorSun(double solarAzimuth,double solarElevation);
-		double TerrainBiggestDifference(mio::Array3D<double> terrain_old, mio::Array3D<double> terrain_new);
+	SnowBRDF BRDFobject;
+	const RadiationField *radobject;
+	SolarPanel *PVobject;
 
+	mio::Array3D<std::vector<double>> SortList;			  // Used for speedup in Terrain Iterations
+	std::vector<std::vector<double>> BasicSet_Horizontal; // Horizontal Basic Set [MT 2.1.1 Basic Set]
+	mio::Array4D<std::vector<double>> BasicSet_rotated;	  // Basic Set rotated in Triangular Pixel Plane [MT 2.1.3 View List, eq. 2.38]
+	mio::Array4D<std::vector<double>> ViewList;			  // Stores all information of network between pixels [MT 2.1.3 View List, eq. 2.47]
+	mio::Array2D<double> RList;							  // List pre-storage of BRDF values
+	mio::Array2D<double> albedo_grid;					  // Albedo value for each square Pixel
 
-		// Standard Vector operations
-		double NormOfVector(std::vector<double> vec1);
-		std::vector<double> normalizeVector(std::vector<double> vec1);
-		double VectorScalarProduct(std::vector<double> vec1, std::vector<double> vec2);
-		std::vector<double> VectorCrossProduct(std::vector<double> vec1, std::vector<double> vec2);
-		std::vector<double> VectorSum(std::vector<double> vec1, std::vector<double> vec2);
-		std::vector<double> VectorDifference(std::vector<double> vec1, std::vector<double> vec2);
-		std::vector<double> VectorStretch(std::vector<double> vec1, double factor);
-		std::vector<double> RotN(std::vector<double> axis, std::vector<double> vec_in, double rad);
-		std::vector<double> ProjectVectorToPlane(std::vector<double> vec1, std::vector<double> plane_normal);
-		double AngleBetween2Vectors(std::vector<double> vec1, std::vector<double> vec2);
+	unsigned int M_epsilon; // Number of small circles in Basic Set [MT fig. 2.1]
+	unsigned int M_phi;		// Number of vectors per small circle of Basic Set [MT fig. 2.1]
+	unsigned int S;			// Number of vectors per Basic Set [MT fig. 2.1]
+	double delta_F_max;		// Stopping Treshold for Iteration in W/m2 [MT eq. 2.100]
 
-
-		// Output functions
-		void PrintProgress(double percentage);
-
-
-		// Variables
-		const size_t dimx, dimy;		
-		mio::DEMObject dem;
-		const mio::Config& cfg;
-
-		SnowBRDF BRDFobject;
-		const RadiationField* radobject;
-		SolarPanel* PVobject;	
-
-		mio::Array3D<std::vector<double> > SortList;				// Used for speedup in Terrain Iterations
-		std::vector< std::vector<double> > BasicSet_Horizontal; 	// Horizontal Basic Set [MT 2.1.1 Basic Set]
-		mio::Array4D<std::vector<double> > BasicSet_rotated;		// Basic Set rotated in Triangular Pixel Plane [MT 2.1.3 View List, eq. 2.38]
-		mio::Array4D<std::vector<double> > ViewList;				// Stores all information of network between pixels [MT 2.1.3 View List, eq. 2.47]
-		mio::Array2D<double> RList; 								// List pre-storage of BRDF values
-		mio::Array2D<double> albedo_grid;							// Albedo value for each square Pixel
-
-		unsigned int M_epsilon;				// Number of small circles in Basic Set [MT fig. 2.1]
-		unsigned int M_phi;					// Number of vectors per small circle of Basic Set [MT fig. 2.1]
-		unsigned int S;						// Number of vectors per Basic Set [MT fig. 2.1]
-		double delta_F_max;					// Stopping Treshold for Iteration in W/m2 [MT eq. 2.100]
-
-		// Keys from io-file
-		bool if_anisotropy=false; 			// Anisotropic or Isotropic Snow Model ?
-		bool if_multiple=false;				// Do Multiple Scattering in Terrain or not ? 
-		bool if_write_view_list=true;		// Write ViewList to file ? 
-		bool if_read_view_list=false;		// Read existing View-list file? -> Speeds up Initialisation by factor ~200
+	// Keys from io-file
+	bool if_anisotropy = false;		// Anisotropic or Isotropic Snow Model ?
+	bool if_multiple = false;		// Do Multiple Scattering in Terrain or not ?
+	bool if_write_view_list = true; // Write ViewList to file ?
+	bool if_read_view_list = false; // Read existing View-list file? -> Speeds up Initialisation by factor ~200
 };
-
 
 #endif
