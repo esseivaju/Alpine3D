@@ -62,7 +62,7 @@ void TerrainRadiationHelbig::getRadiation(const mio::Array2D<double>& direct, mi
 		tdir = direct;
 		tdiff = diffuse;
 		Compute();
-		terrain = total_terrain;
+		terrain = total_terrain; //total_terrain;
     diffuse=tdiff;
     getSkyViewFactor(view_factor);
 }
@@ -143,7 +143,7 @@ int TerrainRadiationHelbig::SWTerrainRadiationStep(const double threshold_itEps_
 				sw_t(i,j) += rad;
 				// in addition the received amount is added to the total radiation at ij
 				glob_h(i,j) += rad;
-        total_terrain(i,j) += rad;
+				total_terrain(i,j) += viewFactor * sw_shoot;
 
 				s++;
 			} // end of if only for distances lower than sw_radius
