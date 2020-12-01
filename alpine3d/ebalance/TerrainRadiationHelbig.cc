@@ -62,7 +62,7 @@ void TerrainRadiationHelbig::getRadiation(const mio::Array2D<double>& direct, mi
 		tdir = direct;
 		tdiff = diffuse;
 		Compute();
-		terrain = total_terrain; //total_terrain;
+		terrain = total_terrain;
     diffuse=tdiff;
     getSkyViewFactor(view_factor);
 }

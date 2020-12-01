@@ -744,6 +744,10 @@ mio::Grid2DObject SnowpackInterface::getGrid(const SnGrids::Parameters& param) c
       return terrain_longwave;
     case SnGrids::VIEW_FACTOR:
       return view_factor;
+    case SnGrids::ISWR_DIFF:
+		  return diffuse;
+		case SnGrids::ISWR_DIR:
+			return shortwave-diffuse-terrain_shortwave;
 		default: ; //so compilers do not complain about missing conditions
 	}
 

@@ -324,10 +324,8 @@ void SnowpackInterfaceWorker::fillGrids(const size_t& ii, const size_t& jj, cons
 				value = meteoPixel.dw; break;
 			case SnGrids::ISWR:
 				value = meteoPixel.iswr; break;
-			case SnGrids::ISWR_DIFF:
-				value = (useEBalance)? meteoPixel.diff : IOUtils::nodata; break;
-			case SnGrids::ISWR_DIR:
-				value = (useEBalance)? meteoPixel.iswr - meteoPixel.diff : IOUtils::nodata; break;
+			case SnGrids::ISWR_BELOW_CAN:
+				value = (useEBalance)? meteoPixel.iswr : IOUtils::nodata; break;
 			case SnGrids::ILWR:
 				value = Atmosphere::blkBody_Radiation(meteoPixel.ea, meteoPixel.ta); break;
 			case SnGrids::HS:
@@ -400,6 +398,8 @@ void SnowpackInterfaceWorker::fillGrids(const size_t& ii, const size_t& jj, cons
       case SnGrids::ISWR_TERRAIN:
       case SnGrids::ILWR_TERRAIN:
       case SnGrids::VIEW_FACTOR:
+      case SnGrids::ISWR_DIR:
+      case SnGrids::ISWR_DIFF:
           break;
 			default:
 				if (it->first>=SnGrids::TSOIL1 && it->first<=SnGrids::lastparam) //dealing with soil temperatures
@@ -408,6 +408,7 @@ void SnowpackInterfaceWorker::fillGrids(const size_t& ii, const size_t& jj, cons
 				}
 				else
 				{
+          std::cout << it->first << std::endl;
 					throw InvalidArgumentException("Invalid parameter requested", AT);
 				}
 		}
