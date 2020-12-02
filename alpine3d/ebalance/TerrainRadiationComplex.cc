@@ -21,6 +21,7 @@
 //file operations
 #include <iostream>
 #include <fstream>
+#include <cstring>
 
 using namespace mio;
 
@@ -76,13 +77,18 @@ TerrainRadiationComplex::TerrainRadiationComplex(const mio::Config &cfg_in, cons
 	{
 
 		initBasicSetHorizontal();
+		std::cout << "[i] Initialized BasicSetHorizontal" << std::endl;
 		initBasicSetRotated();
+		std::cout << "[i] Initialized BasicSetRotated" << std::endl;
 		initViewList();
+		std::cout << "[i] Initialized ViewList" << std::endl;
 	}
 
 	// Initialise Speed-up
 	initRList();
+	std::cout << "[i] Initialized RList" << std::endl;
 	initSortList();
+	std::cout << "[i] Initialized SortList" << std::endl;
 
 	if (if_write_view_list)
 		WriteViewList(); // Write ViewList to file
@@ -153,17 +159,27 @@ void TerrainRadiationComplex::initBasicSetRotated()
 		{
 			for (size_t which_triangle = 0; which_triangle < 2; ++which_triangle) // Triangles: A=1, B=0  [MT Figure 2.2]
 			{
-
-				std::vector<double> triangle_normal = TriangleNormal(ii, jj, which_triangle);
-				std::vector<double> axis = VectorCrossProduct({0, 0, 1}, triangle_normal);	// [MT eq. 2.39]
-				double inclination = acos(VectorScalarProduct(triangle_normal, {0, 0, 1})); // [MT eq. 2.40]
+				double triangle_normal[3], axis[3], z_axis[3] = {0, 0, 1};
+				TriangleNormal(ii, jj, which_triangle, triangle_normal);
+				VectorCrossProduct(z_axis, triangle_normal, axis);						 // [MT eq. 2.39]
+				double inclination = acos(VectorScalarProduct(triangle_normal, z_axis)); // [MT eq. 2.40]
 
 				if (NormOfVector(axis) == 0)
-					axis = {1, 0, 0}; // [MT see text after eq. 2.41]
+				{ // [MT see text after eq. 2.41]
+					axis[0] = 1;
+					axis[1] = 0;
+					axis[2] = 0;
+				}
 
 				for (size_t solidangle = 0; solidangle < S; ++solidangle)
 				{
-					BasicSet_rotated(ii, jj, which_triangle, solidangle) = RotN(axis, BasicSet_Horizontal[solidangle], inclination); // [MT eq. 2.38]
+					double rotated[3];
+					RotN(axis, &BasicSet_Horizontal[solidangle][0], inclination, rotated); // [MT eq. 2.38]
+					auto to_rotate = BasicSet_rotated(ii, jj, which_triangle, solidangle);
+					for (int i = 0; i < 3; ++i)
+					{
+						to_rotate[i] = rotated[i];
+					}
 				}
 			}
 		}
@@ -206,11 +222,22 @@ void TerrainRadiationComplex::initViewList()
 					// Search for Intersection Candidates
 					size_t ii_dem = ii, jj_dem = jj, nb_cells = 0;
 					std::vector<double> ray = BasicSet_rotated(ii, jj, which_triangle, solidangle);
-					std::vector<double> projected_ray = ProjectVectorToPlane(ray, {0, 0, 1}); // [in MT 2.1.3:  projected_ray ~ v_view,yx]
+					if (ray.size() != 3)
+					{
+						throw IndexOutOfBoundsException("Expected array of size 3");
+					}
+					double *ray_arr = &ray[0];
+					double projected_ray[3];
+					double z_axis[3] = {0, 0, 1};
+					ProjectVectorToPlane(ray_arr, z_axis, projected_ray); // [in MT 2.1.3:  projected_ray ~ v_view,yx]
 					if (NormOfVector(projected_ray) != 0)
-						projected_ray = normalizeVector(projected_ray);
+						normalizeVector(projected_ray, projected_ray);
 					else
-						projected_ray = {1, 0, 0}; // if it goes straight up there will be sky (no caves for 2D DEM)
+					{
+						projected_ray[0] = 1;
+						projected_ray[1] = 0;
+						projected_ray[2] = 0;
+					}
 
 					// [MT Figure 2.4] Smart loop over intersection Candidates [Amanatides et al. (1987)]
 					while (!(ii_dem < 1 || ii_dem > dem.getNx() - 2 || jj_dem < 1 || jj_dem > dem.getNy() - 2))
@@ -226,7 +253,7 @@ void TerrainRadiationComplex::initViewList()
 								if ((ii_dem < 1 || ii_dem > dem.getNx() - 2 || jj_dem < 1 || jj_dem > dem.getNy() - 2))
 									continue;
 
-								distance = IntersectionRayTriangle(ray, ii, jj, ii_dem, jj_dem, 0); // Triangles B: [MT Figure 2.2]
+								distance = IntersectionRayTriangle(ray_arr, ii, jj, ii_dem, jj_dem, 0); // Triangles B: [MT Figure 2.2]
 								if (distance != -999 && distance < minimal_distance)
 								{
 									minimal_distance = distance; // If intersection with sevaral trangles, take the closest intersection
@@ -235,7 +262,7 @@ void TerrainRadiationComplex::initViewList()
 									which_triangle_temp = 0;
 								}
 
-								distance = IntersectionRayTriangle(ray, ii, jj, ii_dem, jj_dem, 1); // Triangles A: [MT Figure 2.2]
+								distance = IntersectionRayTriangle(ray_arr, ii, jj, ii_dem, jj_dem, 1); // Triangles A: [MT Figure 2.2]
 								if (distance != -999 && distance < minimal_distance)
 								{
 									minimal_distance = distance; // If intersection with sevaral trangles, take the closest intersection
@@ -252,7 +279,11 @@ void TerrainRadiationComplex::initViewList()
 					if (minimal_distance == dem.cellsize * (dem.getNx() + dem.getNy()))
 						minimal_distance = -999; // No intersection found    =>    -999 == "SKY"
 					if (ii_temp > 0 && ii_temp < dimx)
-						solidangle_temp = vectorToSPixel(VectorStretch(ray, -1), ii_temp, jj_temp, which_triangle_temp);
+					{
+						double ray_stretched[3];
+						VectorStretch(ray_arr, -1, ray_stretched);
+						solidangle_temp = vectorToSPixel(ray_stretched, ii_temp, jj_temp, which_triangle_temp);
+					}
 					ViewList(ii, jj, which_triangle, solidangle) = {(double)ii_temp, (double)jj_temp, (double)which_triangle_temp, minimal_distance, (double)solidangle_temp}; // [MT eq. 2.47]
 				}
 				counter++;
@@ -283,13 +314,18 @@ void TerrainRadiationComplex::initRList()
 	{
 		for (size_t number_solid_out = 0; number_solid_out < S; ++number_solid_out)
 		{
-			std::vector<double> v_in = BasicSet_Horizontal[number_solid_in];
-			std::vector<double> v_out = BasicSet_Horizontal[number_solid_out];
+			double *v_in = &BasicSet_Horizontal[number_solid_in][0];
+			double *v_out = &BasicSet_Horizontal[number_solid_out][0];
 
 			// For Syntax See SnowBRDF-Class
-			double cth_i = VectorScalarProduct(v_in, {0, 0, 1});
-			double cth_v = VectorScalarProduct(v_out, {0, 0, 1});
-			double cphi = VectorScalarProduct(normalizeVector(ProjectVectorToPlane(v_in, {0, 0, 1})), normalizeVector(ProjectVectorToPlane(v_out, {0, 0, 1})));
+			double z_axis[3] = {0, 0, 1}, projected_in[3], projected_out[3];
+			double cth_i = VectorScalarProduct(v_in, z_axis);
+			double cth_v = VectorScalarProduct(v_out, z_axis);
+			ProjectVectorToPlane(v_in, z_axis, projected_in);
+			normalizeVector(projected_in, projected_in);
+			ProjectVectorToPlane(v_out, z_axis, projected_out);
+			normalizeVector(projected_out, projected_out);
+			double cphi = VectorScalarProduct(projected_in, projected_out);
 
 			RList(number_solid_in, number_solid_out) = BRDFobject.get_RF(cth_i, cphi, cth_v);
 		}
@@ -525,7 +561,9 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, m
 	// Get Sun-Vector
 	double solarAzimuth, solarElevation;
 	radobject->getPositionSun(solarAzimuth, solarElevation);
-	std::vector<double> v_sun = getVectorSun(solarAzimuth, solarElevation);
+	double a_sun[3];
+	getVectorSun(solarAzimuth, solarElevation, a_sun);
+	double z_axis[3] = {0, 0, 1};
 
 // Calculate [MT eq. 2.96] and all Elements thereof
 #pragma omp parallel for
@@ -539,17 +577,20 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, m
 			double distance_closest_triangle;
 
 			// Triangle-A, Geometric projection: horizontal radiation -> beam radiation -> triangle radiation
-			if (v_sun[2] > 0 && VectorScalarProduct(TriangleNormal(ii, jj, 1), v_sun) > 0)
+			double triangle_a[3];
+			TriangleNormal(ii, jj, 1, triangle_a);
+			if (a_sun[2] > 0 && VectorScalarProduct(triangle_a, a_sun) > 0)
 			{
 				double proj_to_ray, proj_to_triangle;
-				std::vector<double> triangle_normal = TriangleNormal(ii, jj, 1);
+				double triangle_normal[3];
+				std::memcpy(triangle_normal, triangle_a, sizeof(double) * 3);
 
-				proj_to_ray = 1. / VectorScalarProduct(v_sun, {0, 0, 1});
-				proj_to_triangle = VectorScalarProduct(v_sun, triangle_normal);
+				proj_to_ray = 1. / VectorScalarProduct(a_sun, z_axis);
+				proj_to_triangle = VectorScalarProduct(a_sun, triangle_normal);
 
 				direct_A(ii, jj) = direct_unshaded_horizontal(ii, jj) * proj_to_ray * proj_to_triangle;
 
-				solidangle_sun = vectorToSPixel(v_sun, ii, jj, 1);
+				solidangle_sun = vectorToSPixel(a_sun, ii, jj, 1);
 				distance_closest_triangle = ViewList(ii, jj, 1, solidangle_sun)[3];
 
 				if (distance_closest_triangle != -999)
@@ -559,17 +600,20 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, m
 				direct_A(ii, jj) = 0;
 
 			// Triangle-B, Geometric projection: horizontal radiation -> beam radiation -> triangle radiation
-			if (v_sun[2] > 0 && VectorScalarProduct(TriangleNormal(ii, jj, 0), v_sun) > 0)
+			double triangle_b[3];
+			TriangleNormal(ii, jj, 0, triangle_b);
+			if (a_sun[2] > 0 && VectorScalarProduct(triangle_b, a_sun) > 0)
 			{
 				double proj_to_ray, proj_to_triangle;
-				std::vector<double> triangle_normal = TriangleNormal(ii, jj, 0);
+				double triangle_normal[3];
+				std::memcpy(triangle_normal, triangle_b, sizeof(double) * 3);
 
-				proj_to_ray = 1. / VectorScalarProduct(v_sun, {0, 0, 1});
-				proj_to_triangle = VectorScalarProduct(v_sun, triangle_normal);
+				proj_to_ray = 1. / VectorScalarProduct(a_sun, z_axis);
+				proj_to_triangle = VectorScalarProduct(a_sun, triangle_normal);
 
 				direct_B(ii, jj) = direct_unshaded_horizontal(ii, jj) * proj_to_ray * proj_to_triangle;
 
-				solidangle_sun = vectorToSPixel(v_sun, ii, jj, 0);
+				solidangle_sun = vectorToSPixel(a_sun, ii, jj, 0);
 				distance_closest_triangle = ViewList(ii, jj, 0, solidangle_sun)[3];
 
 				if (distance_closest_triangle != -999)
@@ -594,7 +638,7 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, m
 
 			for (size_t which_triangle = 0; which_triangle < 2; ++which_triangle) // Triangles: A=1, B=0  [MT Figure 2.2]
 			{
-				if (v_sun[2] < 0)
+				if (a_sun[2] < 0)
 					continue; // might be to strict for Dawn..
 
 				if (which_triangle == 1)
@@ -607,9 +651,10 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, m
 					diffuse_t = skydiffuse_B(ii, jj);
 					direct_t = direct_B(ii, jj);
 				}
-
-				if (VectorScalarProduct(TriangleNormal(ii, jj, which_triangle), v_sun) > 0)
-					solidangle_sun = vectorToSPixel(v_sun, ii, jj, which_triangle);
+				double triangle_normal[3];
+				TriangleNormal(ii, jj, which_triangle, triangle_normal);
+				if (VectorScalarProduct(triangle_normal, a_sun) > 0)
+					solidangle_sun = vectorToSPixel(a_sun, ii, jj, which_triangle);
 				else
 					solidangle_sun = 0;
 
@@ -644,7 +689,7 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, m
 		another_round = 0; // if multiple scattering is turned false, do just one iteration
 	size_t number_rounds = 0;
 
-	while (another_round && v_sun[2] > 0)
+	while (another_round && a_sun[2] > 0)
 	{
 
 		TList_ms_old = TList_ms_new + TList_sky_aniso;
@@ -711,7 +756,7 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, m
 
 	// last (if multiple scattering) or only (if no multiple scattering) Iteration.
 	// Very similar to Land-Main-Loop, but no speed up in core loop as data is prepared for SolarPanel-class
-	if (v_sun[2] > 0)
+	if (a_sun[2] > 0)
 	{
 		TList_ms_old = TList_ms_new + TList_sky_aniso;
 		terrain_flux_old = terrain_flux_new;
@@ -804,26 +849,25 @@ void TerrainRadiationComplex::setMeteo(const mio::Array2D<double> &albedo, const
 * @param[in] which_triangle: 1 or 2 
 * @param[out] {n_x,n_y,n_z} 
 */
-std::vector<double> TerrainRadiationComplex::TriangleNormal(size_t ii_dem, size_t jj_dem, int which_triangle)
+void TerrainRadiationComplex::TriangleNormal(size_t ii_dem, size_t jj_dem, int which_triangle, double *v_out)
 {
-	std::vector<double> e_x, e_y, n;
 	double cellsize = dem.cellsize;
-
+	double n[3];
 	// Triangles: A=1, B=0  [MT Figure 2.2]
 	if (which_triangle == 1)
 	{
-		e_x = {-cellsize, 0, dem(ii_dem - 1, jj_dem) - dem(ii_dem, jj_dem)}; //[MT eq. 2.17]
-		e_y = {0, cellsize, dem(ii_dem, jj_dem + 1) - dem(ii_dem, jj_dem)};	 //[MT eq. 2.18]
+		double e_x[3] = {-cellsize, 0, dem(ii_dem - 1, jj_dem) - dem(ii_dem, jj_dem)}; //[MT eq. 2.17]
+		double e_y[3] = {0, cellsize, dem(ii_dem, jj_dem + 1) - dem(ii_dem, jj_dem)};  //[MT eq. 2.18]
+		VectorCrossProduct(e_y, e_x, n);											   //[MT eq. 2.21]
 	}
 	else
 	{
-		e_x = {cellsize, 0, dem(ii_dem + 1, jj_dem) - dem(ii_dem, jj_dem)};	 //[MT eq. 2.19]
-		e_y = {0, -cellsize, dem(ii_dem, jj_dem - 1) - dem(ii_dem, jj_dem)}; //[MT eq. 2.20]
+		double e_x[3] = {cellsize, 0, dem(ii_dem + 1, jj_dem) - dem(ii_dem, jj_dem)};  //[MT eq. 2.19]
+		double e_y[3] = {0, -cellsize, dem(ii_dem, jj_dem - 1) - dem(ii_dem, jj_dem)}; //[MT eq. 2.20]
+		VectorCrossProduct(e_y, e_x, n);											   //[MT eq. 2.21]
 	}
 
-	n = VectorCrossProduct(e_y, e_x); //[MT eq. 2.21]
-
-	return normalizeVector(n);
+	return normalizeVector(n, v_out);
 }
 
 /**
@@ -833,10 +877,9 @@ std::vector<double> TerrainRadiationComplex::TriangleNormal(size_t ii_dem, size_
 * @param[in] ii, jj, which_triangle: to check intersection with
 * @param[out] distance  
 */
-double TerrainRadiationComplex::IntersectionRayTriangle(std::vector<double> v_view, size_t mm, size_t nn, size_t ii, size_t jj, size_t which_triangle)
+double TerrainRadiationComplex::IntersectionRayTriangle(double v_view[], size_t mm, size_t nn, size_t ii, size_t jj, size_t which_triangle)
 {
-	std::vector<double> aufpunkt_ray, balance_point_par, intersection;
-	std::vector<double> e_x, e_y, e_xT, e_yT, n;
+	double intersection[3], e_x[3], e_y[3], e_xT[3], e_yT[3], n[3];
 
 	double cellsize = dem.cellsize;
 	double distance, P_3, r_3;
@@ -845,24 +888,37 @@ double TerrainRadiationComplex::IntersectionRayTriangle(std::vector<double> v_vi
 	// Triangles: A=1, B=0  [MT Figure 2.2]
 	if (which_triangle == 1)
 	{
-		e_x = {-cellsize, 0, dem(ii - 1, jj) - dem(ii, jj)}; //[MT eq. 2.17]
-		e_y = {0, cellsize, dem(ii, jj + 1) - dem(ii, jj)};	 //[MT eq. 2.18]
+		//[MT eq. 2.17]
+		e_x[0] = -cellsize;
+		e_x[1] = 0;
+		e_x[2] = dem(ii - 1, jj) - dem(ii, jj);
+		//[MT eq. 2.18]
+		e_y[0] = 0;
+		e_y[1] = cellsize;
+		e_y[2] = dem(ii, jj + 1) - dem(ii, jj);
 	}
 	else
 	{
-		e_x = {cellsize, 0, dem(ii + 1, jj) - dem(ii, jj)};	 //[MT eq. 2.19]
-		e_y = {0, -cellsize, dem(ii, jj - 1) - dem(ii, jj)}; //[MT eq. 2.20]
+		//[MT eq. 2.19]
+		e_x[0] = cellsize;
+		e_x[1] = 0;
+		e_x[2] = dem(ii + 1, jj) - dem(ii, jj);
+		//[MT eq. 2.20]
+		e_y[0] = 0;
+		e_y[1] = -cellsize;
+		e_y[2] = dem(ii, jj - 1) - dem(ii, jj);
 	}
-	n = TriangleNormal(ii, jj, which_triangle);
+	TriangleNormal(ii, jj, which_triangle, n);
 
 	if (VectorScalarProduct(n, v_view) > 0)
 		return -999; // Must hit frontal
 
-	aufpunkt_ray = {mm * cellsize, nn * cellsize, dem(mm, nn) + 0.01}; // 0.01 : Place Basic Set slightly above surface to prevent trivial intersections with itself
-	balance_point_par = {ii * cellsize, jj * cellsize, dem(ii, jj)};   // [ ~MT eq. 2.22]
-
-	P_3 = VectorScalarProduct(VectorDifference(aufpunkt_ray, balance_point_par), n); // nominator in rhs of [MT eq. 2.25]
-	r_3 = VectorScalarProduct(v_view, n);											 // denominator in rhs of [MT eq. 2.25]
+	double aufpunkt_ray[] = {mm * cellsize, nn * cellsize, dem(mm, nn) + 0.01}; // 0.01 : Place Basic Set slightly above surface to prevent trivial intersections with itself
+	double balance_point_par[] = {ii * cellsize, jj * cellsize, dem(ii, jj)};	// [ ~MT eq. 2.22]
+	double v_diff[3];
+	VectorDifference(aufpunkt_ray, balance_point_par, v_diff);
+	P_3 = VectorScalarProduct(v_diff, n); // nominator in rhs of [MT eq. 2.25]
+	r_3 = VectorScalarProduct(v_view, n); // denominator in rhs of [MT eq. 2.25]
 
 	if (fabs(r_3) < 0.0000001)
 		return -999; // Prevent overflow
@@ -872,14 +928,17 @@ double TerrainRadiationComplex::IntersectionRayTriangle(std::vector<double> v_vi
 	if (distance < 0)
 		return -999; // light cannot cross the ground
 
-	intersection = VectorDifference(VectorSum(aufpunkt_ray, VectorStretch(v_view, distance)), balance_point_par); // [MT eq. 2.26] or better see [MT fig. 2.3]
+	double view_stretch[3], ray_view_sum[3];
+	VectorStretch(v_view, distance, view_stretch);
+	VectorSum(aufpunkt_ray, view_stretch, ray_view_sum);
+	VectorDifference(ray_view_sum, balance_point_par, intersection); // [MT eq. 2.26] or better see [MT fig. 2.3]
 
 	// Now slightl different (less formal) procedure than [MT eq. 2.27-2.30]:
 	// Want elementary vector, that is normal to e_x => crossproduct
 	// scalarproduct with [MT eq. 2.27] projects out intersection_x
 	// same for e_y ..
-	e_xT = VectorCrossProduct(n, e_x);
-	e_yT = VectorCrossProduct(n, e_y);
+	VectorCrossProduct(n, e_x, e_xT);
+	VectorCrossProduct(n, e_y, e_yT);
 
 	intersection_x = VectorScalarProduct(intersection, e_yT) / VectorScalarProduct(e_x, e_yT);
 	intersection_y = VectorScalarProduct(intersection, e_xT) / VectorScalarProduct(e_y, e_xT);
@@ -897,7 +956,7 @@ double TerrainRadiationComplex::IntersectionRayTriangle(std::vector<double> v_vi
 * @param[in] ii, jj, which_triangle: triangle specification
 * @param[out] list_index: Index of vector in Basic Set  
 */
-size_t TerrainRadiationComplex::vectorToSPixel(std::vector<double> vec_in, size_t ii_dem, size_t jj_dem, int which_triangle)
+size_t TerrainRadiationComplex::vectorToSPixel(double vec_in[], size_t ii_dem, size_t jj_dem, int which_triangle)
 {
 
 	double azimuth_flat;
@@ -905,16 +964,22 @@ size_t TerrainRadiationComplex::vectorToSPixel(std::vector<double> vec_in, size_
 	int m, n = -1;
 	size_t list_index;
 
-	std::vector<double> vec_horizontal, vec_projected_xy;
+	double vec_horizontal[3];
 
-	std::vector<double> triangle_normal = TriangleNormal(ii_dem, jj_dem, which_triangle);
-	double inclination = AngleBetween2Vectors(triangle_normal, {0, 0, 1});
+	double triangle_normal[3], z_axis[] = {0, 0, 1};
+	TriangleNormal(ii_dem, jj_dem, which_triangle, triangle_normal);
+	double inclination = AngleBetween2Vectors(triangle_normal, z_axis);
 
-	std::vector<double> axis = VectorCrossProduct({0, 0, 1}, triangle_normal);
+	double axis[3];
+	VectorCrossProduct(z_axis, triangle_normal, axis);
 	if (NormOfVector(axis) == 0)
-		axis = {1, 0, 0};
+	{
+		axis[0] = 1;
+		axis[1] = 0;
+		axis[2] = 0;
+	}
 
-	vec_horizontal = RotN(axis, vec_in, -inclination); // Backrotation in flat Basic Set [MT eq. 2.42]
+	RotN(axis, vec_in, -inclination, vec_horizontal); // Backrotation in flat Basic Set [MT eq. 2.42]
 
 	// If Vector is below trangle-plane
 	if (vec_horizontal[2] < 0)
@@ -923,8 +988,8 @@ size_t TerrainRadiationComplex::vectorToSPixel(std::vector<double> vec_in, size_
 		return -999;
 	}
 
-	vec_projected_xy = {vec_horizontal[0], vec_horizontal[1], 0};
-	azimuth_flat = AngleBetween2Vectors(vec_projected_xy, {0, 1, 0}); // [MT eq. 2.43]
+	double vec_projected_xy[] = {vec_horizontal[0], vec_horizontal[1], 0};
+	azimuth_flat = AngleBetween2Vectors(vec_projected_xy, z_axis); // [MT eq. 2.43]
 	if (vec_projected_xy[0] < 0)
 		azimuth_flat = 2 * Cst::PI - azimuth_flat;				  // AngleBetween2Vectors is not uniquely defined;
 	phi = AngleBetween2Vectors(vec_horizontal, vec_projected_xy); // [MT eq. 2.44]
@@ -988,14 +1053,11 @@ double TerrainRadiationComplex::getSkyViewFactor(size_t ii_dem, size_t jj_dem, i
 * @param[in] solarElevation: from horizontal in degrees
 * @param[out] v_out: normalized vector pointing towards the sun
 */
-std::vector<double> TerrainRadiationComplex::getVectorSun(double solarAzimuth, double solarElevation)
+void TerrainRadiationComplex::getVectorSun(double solarAzimuth, double solarElevation, double *v_out)
 {
-	std::vector<double> v_out = {0, 0, 0};
 	v_out[0] = cos(solarElevation * Cst::to_rad) * sin(solarAzimuth * Cst::to_rad);
 	v_out[1] = cos(solarElevation * Cst::to_rad) * cos(solarAzimuth * Cst::to_rad);
 	v_out[2] = sin(solarElevation * Cst::to_rad);
-
-	return v_out;
 }
 
 /**
@@ -1030,7 +1092,7 @@ double TerrainRadiationComplex::TerrainBiggestDifference(mio::Array3D<double> te
 /**
 * @brief Standard vector operation: Calculates Norm
 */
-double TerrainRadiationComplex::NormOfVector(std::vector<double> vec1)
+double TerrainRadiationComplex::NormOfVector(double vec1[])
 {
 	return sqrt(VectorScalarProduct(vec1, vec1));
 }
@@ -1038,31 +1100,29 @@ double TerrainRadiationComplex::NormOfVector(std::vector<double> vec1)
 /**
 * @brief Standard vector operation: Normalization
 */
-std::vector<double> TerrainRadiationComplex::normalizeVector(std::vector<double> vec1)
+void TerrainRadiationComplex::normalizeVector(double vec1[], double *v_out)
 {
 	double norm = NormOfVector(vec1);
 	if (norm == 0)
 	{
 		std::cout << "Exception in TerrainRadiationComplex::normalizeVector : norm is zero\n";
-		return vec1;
+		return;
 	}
 
-	for (size_t i = 0; i < vec1.size(); ++i)
+	for (size_t i = 0; i < 3; ++i)
 	{
-		vec1[i] = vec1[i] / norm;
+		v_out[i] = vec1[i] / norm;
 	}
-
-	return vec1;
 }
 
 /**
 * @brief Standard vector operation: ScalarProduct
 */
-double TerrainRadiationComplex::VectorScalarProduct(std::vector<double> vec1, std::vector<double> vec2)
+double TerrainRadiationComplex::VectorScalarProduct(double vec1[], double vec2[])
 {
 	double sum = 0;
 
-	for (size_t i = 0; i < vec1.size(); ++i)
+	for (size_t i = 0; i < 3; ++i)
 	{
 		sum += vec1[i] * vec2[i];
 	}
@@ -1073,68 +1133,51 @@ double TerrainRadiationComplex::VectorScalarProduct(std::vector<double> vec1, st
 /**
 * @brief Standard vector operation: CrossProduct
 */
-std::vector<double> TerrainRadiationComplex::VectorCrossProduct(std::vector<double> vec1, std::vector<double> vec2)
+void TerrainRadiationComplex::VectorCrossProduct(double vec1[], double vec2[], double *v_out)
 {
-	std::vector<double> v_out;
-	v_out = {0, 0, 0};
 
 	v_out[0] = vec1[1] * vec2[2] - vec1[2] * vec2[1];
 	v_out[1] = vec1[2] * vec2[0] - vec1[0] * vec2[2];
 	v_out[2] = vec1[0] * vec2[1] - vec1[1] * vec2[0];
-
-	return v_out;
 }
 
 /**
-* @brief Standard vector operation: Sum
+* @brief Standard vector operation: Sum. Expects arrays of len 3.
 */
-std::vector<double> TerrainRadiationComplex::VectorSum(std::vector<double> vec1, std::vector<double> vec2)
+void TerrainRadiationComplex::VectorSum(double vec1[], double vec2[], double *v_out)
 {
-	std::vector<double> v_out;
-	v_out = {0, 0, 0};
-
-	for (size_t i = 0; i < vec1.size(); ++i)
+	for (size_t i = 0; i < 3; ++i)
 	{
 		v_out[i] = vec1[i] + vec2[i];
 	}
-
-	return v_out;
 }
 
 /**
-* @brief Standard vector operation: Difference
+* @brief Standard vector operation: Difference. Expects arrays of len 3.
 */
-std::vector<double> TerrainRadiationComplex::VectorDifference(std::vector<double> vec1, std::vector<double> vec2)
+void TerrainRadiationComplex::VectorDifference(double vec1[], double vec2[], double *v_out)
 {
-	std::vector<double> v_out;
-
-	v_out = VectorSum(vec1, VectorStretch(vec2, -1));
-
-	return v_out;
+	double v_stretched[3];
+	VectorStretch(vec2, -1, v_stretched);
+	VectorSum(vec1, v_stretched, v_out);
 }
 
 /**
-* @brief Standard vector operation: Multiplication with real number
+* @brief Standard vector operation: Multiplication with real number. Expects arrays of len 3.
 */
-std::vector<double> TerrainRadiationComplex::VectorStretch(std::vector<double> vec1, double factor)
+void TerrainRadiationComplex::VectorStretch(double vec1[], double factor, double *v_out)
 {
-	std::vector<double> v_out;
-	v_out = {0, 0, 0};
-
-	for (size_t i = 0; i < vec1.size(); ++i)
+	for (size_t i = 0; i < 3; ++i)
 	{
 		v_out[i] = vec1[i] * factor;
 	}
-
-	return v_out;
 }
 
 /**
 * @brief Standard vector operation: Rotation along given axis [MT eq. 2.41]
 */
-std::vector<double> TerrainRadiationComplex::RotN(std::vector<double> axis, std::vector<double> vec_in, double rad)
+void TerrainRadiationComplex::RotN(double axis[], double vec_in[], double rad, double *v_out)
 {
-	std::vector<double> vec_out(3);
 	double c = cos(rad);
 	double s = sin(rad);
 
@@ -1142,42 +1185,36 @@ std::vector<double> TerrainRadiationComplex::RotN(std::vector<double> axis, std:
 	double n2 = axis[1] / NormOfVector(axis);
 	double n3 = axis[2] / NormOfVector(axis);
 
-	vec_out[0] = (n1 * n1 * (1 - c) + c) * vec_in[0] + (n1 * n2 * (1 - c) - n3 * s) * vec_in[1] + (n1 * n3 * (1 - c) + n2 * s) * vec_in[2];
-	vec_out[1] = (n2 * n1 * (1 - c) + n3 * s) * vec_in[0] + (n2 * n2 * (1 - c) + c) * vec_in[1] + (n2 * n3 * (1 - c) - n1 * s) * vec_in[2];
-	vec_out[2] = (n3 * n1 * (1 - c) - n2 * s) * vec_in[0] + (n3 * n2 * (1 - c) + n1 * s) * vec_in[1] + (n3 * n3 * (1 - c) + c) * vec_in[2];
-
-	return vec_out;
+	v_out[0] = (n1 * n1 * (1 - c) + c) * vec_in[0] + (n1 * n2 * (1 - c) - n3 * s) * vec_in[1] + (n1 * n3 * (1 - c) + n2 * s) * vec_in[2];
+	v_out[1] = (n2 * n1 * (1 - c) + n3 * s) * vec_in[0] + (n2 * n2 * (1 - c) + c) * vec_in[1] + (n2 * n3 * (1 - c) - n1 * s) * vec_in[2];
+	v_out[2] = (n3 * n1 * (1 - c) - n2 * s) * vec_in[0] + (n3 * n2 * (1 - c) + n1 * s) * vec_in[1] + (n3 * n3 * (1 - c) + c) * vec_in[2];
 }
 
 /**
 * @brief Standard vector operation: Project vector "vec_1" to plane defined by normal vector "plane_normal"
 */
-std::vector<double> TerrainRadiationComplex::ProjectVectorToPlane(std::vector<double> vec1, std::vector<double> plane_normal)
+void TerrainRadiationComplex::ProjectVectorToPlane(double vec1[], double plane_normal[], double *v_out)
 {
-	std::vector<double> normal = plane_normal, v_out = vec1;
-	normal = normalizeVector(normal);
+	//std::vector<double> normal = plane_normal, v_out = vec1;
+	double normal[3];
+	normalizeVector(plane_normal, normal);
 	double proj = VectorScalarProduct(normal, vec1);
-
-	for (size_t i = 0; i < vec1.size(); ++i)
+	for (size_t i = 0; i < 3; ++i)
 	{
 		v_out[i] = vec1[i] - proj * normal[i];
 	}
-
-	return v_out;
 }
 
 /**
 * @brief Standard vector operation: Angle between 2 Vectors [rad]
 */
-double TerrainRadiationComplex::AngleBetween2Vectors(std::vector<double> vec1, std::vector<double> vec2)
+double TerrainRadiationComplex::AngleBetween2Vectors(double vec1[], double vec2[])
 {
 	double sum = 0;
 	double angle = 0;
 	double norm1, norm2;
-	if (vec1.size() != vec2.size())
-		return -999;
 
-	for (size_t i = 0; i < vec1.size(); ++i)
+	for (size_t i = 0; i < 3; ++i)
 	{
 		sum += vec1[i] * vec2[i];
 	}

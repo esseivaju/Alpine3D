@@ -82,25 +82,25 @@ private:
 	bool ReadViewList();
 
 	// auxiliary functions
-	std::vector<double> TriangleNormal(size_t ii_dem, size_t jj_dem, int which_triangle);
-	double IntersectionRayTriangle(std::vector<double> ray, size_t ii_0, size_t jj_0, size_t ii_dem, size_t jj_dem, size_t which_triangle);
-	size_t vectorToSPixel(std::vector<double> vec_in, size_t ii_dem, size_t jj_dem, int which_triangle);
+	void TriangleNormal(size_t ii_dem, size_t jj_dem, int which_triangle, double * v_out);
+	double IntersectionRayTriangle(double v_view[], size_t ii_0, size_t jj_0, size_t ii_dem, size_t jj_dem, size_t which_triangle);
+	size_t vectorToSPixel(double vec_in[], size_t ii_dem, size_t jj_dem, int which_triangle);
 	double getLandViewFactor(size_t ii_dem, size_t jj_dem, int which_triangle);
 	double getSkyViewFactor(size_t ii_dem, size_t jj_dem, int which_triangle);
-	std::vector<double> getVectorSun(double solarAzimuth, double solarElevation);
+	void getVectorSun(double solarAzimuth, double solarElevation, double *v_out);
 	double TerrainBiggestDifference(mio::Array3D<double> terrain_old, mio::Array3D<double> terrain_new);
 
 	// Standard Vector operations
-	double NormOfVector(std::vector<double> vec1);
-	std::vector<double> normalizeVector(std::vector<double> vec1);
-	double VectorScalarProduct(std::vector<double> vec1, std::vector<double> vec2);
-	std::vector<double> VectorCrossProduct(std::vector<double> vec1, std::vector<double> vec2);
-	std::vector<double> VectorSum(std::vector<double> vec1, std::vector<double> vec2);
-	std::vector<double> VectorDifference(std::vector<double> vec1, std::vector<double> vec2);
-	std::vector<double> VectorStretch(std::vector<double> vec1, double factor);
-	std::vector<double> RotN(std::vector<double> axis, std::vector<double> vec_in, double rad);
-	std::vector<double> ProjectVectorToPlane(std::vector<double> vec1, std::vector<double> plane_normal);
-	double AngleBetween2Vectors(std::vector<double> vec1, std::vector<double> vec2);
+	double NormOfVector(double vec1[]);
+	void normalizeVector(double vec1[], double *v_out);
+	double VectorScalarProduct(double vec1[], double vec2[]);
+	void VectorCrossProduct(double vec1[], double vec2[], double *v_out);
+	void VectorSum(double vec1[], double vec2[], double *v_out);
+	void VectorDifference(double vec1[], double vec2[], double *v_out);
+	void VectorStretch(double vec1[], double factor, double *v_out);
+	void RotN(double axis[], double vec_in[], double rad, double *v_out);
+	void ProjectVectorToPlane(double vec1[], double plane_normal[], double *v_out);
+	double AngleBetween2Vectors(double vec1[], double vec2[]);
 
 	// Output functions
 	void PrintProgress(double percentage);
