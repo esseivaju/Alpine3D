@@ -72,6 +72,8 @@ public:
 	void setMeteo(const mio::Array2D<double> &albedo, const mio::Array2D<double> &ta, const mio::Array2D<double> &rh, const mio::Array2D<double> &ilwr);
 
 private:
+	typedef std::array<double, 3> Vec3D;
+
 	// Initialisation Functions
 	void initBasicSetHorizontal();
 	void initBasicSetRotated();
@@ -82,25 +84,25 @@ private:
 	bool ReadViewList();
 
 	// auxiliary functions
-	void TriangleNormal(size_t ii_dem, size_t jj_dem, int which_triangle, double * v_out);
-	double IntersectionRayTriangle(double v_view[], size_t ii_0, size_t jj_0, size_t ii_dem, size_t jj_dem, size_t which_triangle);
-	size_t vectorToSPixel(double vec_in[], size_t ii_dem, size_t jj_dem, int which_triangle);
+	void TriangleNormal(size_t ii_dem, size_t jj_dem, int which_triangle, Vec3D &v_out);
+	double IntersectionRayTriangle(Vec3D &v_view, size_t ii_0, size_t jj_0, size_t ii_dem, size_t jj_dem, size_t which_triangle);
+	size_t vectorToSPixel(Vec3D &vec_in, size_t ii_dem, size_t jj_dem, int which_triangle);
 	double getLandViewFactor(size_t ii_dem, size_t jj_dem, int which_triangle);
 	double getSkyViewFactor(size_t ii_dem, size_t jj_dem, int which_triangle);
-	void getVectorSun(double solarAzimuth, double solarElevation, double *v_out);
+	void getVectorSun(double solarAzimuth, double solarElevation, Vec3D &v_out);
 	double TerrainBiggestDifference(mio::Array3D<double> terrain_old, mio::Array3D<double> terrain_new);
 
 	// Standard Vector operations
-	double NormOfVector(double vec1[]);
-	void normalizeVector(double vec1[], double *v_out);
-	double VectorScalarProduct(double vec1[], double vec2[]);
-	void VectorCrossProduct(double vec1[], double vec2[], double *v_out);
-	void VectorSum(double vec1[], double vec2[], double *v_out);
-	void VectorDifference(double vec1[], double vec2[], double *v_out);
-	void VectorStretch(double vec1[], double factor, double *v_out);
-	void RotN(double axis[], double vec_in[], double rad, double *v_out);
-	void ProjectVectorToPlane(double vec1[], double plane_normal[], double *v_out);
-	double AngleBetween2Vectors(double vec1[], double vec2[]);
+	double NormOfVector(Vec3D &vec1);
+	void normalizeVector(Vec3D &vec1, Vec3D &v_out);
+	double VectorScalarProduct(Vec3D &vec1, Vec3D &vec2);
+	void VectorCrossProduct(Vec3D &vec1, Vec3D &vec2, Vec3D &v_out);
+	void VectorSum(Vec3D &vec1, Vec3D &vec2, Vec3D &v_out);
+	void VectorDifference(Vec3D &vec1, Vec3D &vec2, Vec3D &v_out);
+	void VectorStretch(Vec3D &vec1, double factor, Vec3D &v_out);
+	void RotN(Vec3D &axis, Vec3D &vec_in, double rad, Vec3D &v_out);
+	void ProjectVectorToPlane(Vec3D &vec1, Vec3D &plane_normal, Vec3D &v_out);
+	double AngleBetween2Vectors(Vec3D &vec1, Vec3D &vec2);
 
 	// Output functions
 	void PrintProgress(double percentage);
