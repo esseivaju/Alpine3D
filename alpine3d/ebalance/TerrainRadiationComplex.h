@@ -24,6 +24,7 @@
 #include <alpine3d/ebalance/RadiationField.h>
 #include <alpine3d/ebalance/SolarPanel.h>
 #include <alpine3d/ebalance/SnowBRDF.h>
+#include <array>
 
 /**
  * @page TerrainRadiationComplex

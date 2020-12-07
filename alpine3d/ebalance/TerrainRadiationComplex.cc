@@ -22,8 +22,9 @@
 #include <iostream>
 #include <fstream>
 #include <cstring>
-#include <array>
 #include <algorithm>
+#include <limits>
+#include <cmath>
 
 using namespace mio;
 
@@ -399,7 +400,7 @@ void TerrainRadiationComplex::WriteViewList()
 {
 	std::ofstream GL_file;
 	GL_file.open("../output/ViewList.rad");
-
+	GL_file.precision(std::numeric_limits<double>::digits10);
 	GL_file << "SMET 1.1 ASCII\n[HEADER]\n";
 	GL_file << "ncols =\t" << dimx << "\n";
 	GL_file << "nrows =\t" << dimy << "\n";
@@ -458,13 +459,13 @@ bool TerrainRadiationComplex::ReadViewList()
 	std::vector<double> vec_data;
 	myreader.read(vec_data);
 	const size_t nr_fields = myreader.get_nr_of_fields();
-	size_t dimx_file = (size_t)myreader.get_header_doublevalue("ncols");
-	size_t dimy_file = (size_t)myreader.get_header_doublevalue("nrows");
+	size_t dimx_file = static_cast<size_t>(myreader.get_header_doublevalue("ncols"));
+	size_t dimy_file = static_cast<size_t>(myreader.get_header_doublevalue("nrows"));
 	double cellsize_file = myreader.get_header_doublevalue("cellsize");
-	size_t llx = (size_t)myreader.get_header_doublevalue("easting");
-	size_t lly = (size_t)myreader.get_header_doublevalue("northing");
-	size_t azimuth_points = (size_t)myreader.get_header_doublevalue("Azimuth Points");
-	size_t elevation_points = (size_t)myreader.get_header_doublevalue("Elevation Points");
+	double llx = myreader.get_header_doublevalue("easting");
+	double lly = myreader.get_header_doublevalue("northing");
+	size_t azimuth_points = static_cast<size_t>(myreader.get_header_doublevalue("Azimuth Points"));
+	size_t elevation_points = static_cast<size_t>(myreader.get_header_doublevalue("Elevation Points"));
 
 	M_epsilon = elevation_points;
 	M_phi = azimuth_points;
@@ -480,9 +481,10 @@ bool TerrainRadiationComplex::ReadViewList()
 		std::cout << "[E] in TerrainRadiationComplex::ReadViewList: DEM does not agree with TerrainList for field: dimy\n";
 		return false;
 	}
-	if (cellsize_file != dem.cellsize)
+	if (std::fabs(cellsize_file - dem.cellsize) >= std::numeric_limits<double>::epsilon())
 	{
-		std::cout << "[E] in TerrainRadiationComplex::ReadViewList: DEM does not agree with TerrainList for field: cellsize\n";
+		std::cout.precision(std::numeric_limits<double>::digits10);
+		std::cout << "[E] in TerrainRadiationComplex::ReadViewList: DEM does not agree with TerrainList for field: cellsize (got: " << cellsize_file << ", expected: " << dem.cellsize << ")\n";
 		return false;
 	}
 	if (dimx_file != dimx)
@@ -490,14 +492,16 @@ bool TerrainRadiationComplex::ReadViewList()
 		std::cout << "[E] in TerrainRadiationComplex::ReadViewList: DEM does not agree with TerrainList for field: dimx\n";
 		return false;
 	}
-	if (llx != dem.llcorner.getEasting())
+	if (std::fabs(llx - dem.llcorner.getEasting()) >= std::numeric_limits<double>::epsilon())
 	{
-		std::cout << "[E] in TerrainRadiationComplex::ReadViewList: DEM does not agree with TerrainList for field: llx\n";
+		std::cout.precision(std::numeric_limits<double>::digits10);
+		std::cout << "[E] in TerrainRadiationComplex::ReadViewList: DEM does not agree with TerrainList for field: llx (got: " << llx << ", expected: " << dem.llcorner.getEasting() << ")\n";
 		return false;
 	}
-	if (lly != dem.llcorner.getNorthing())
+	if (std::fabs(lly - dem.llcorner.getNorthing()) >= std::numeric_limits<double>::epsilon())
 	{
-		std::cout << "[E] in TerrainRadiationComplex::ReadViewList: DEM does not agree with TerrainList for field: lly\n";
+		std::cout.precision(std::numeric_limits<double>::digits10);
+		std::cout << "[E] in TerrainRadiationComplex::ReadViewList: DEM does not agree with TerrainList for field: lly (got: " << lly << ", expected: " << dem.llcorner.getNorthing() << ")\n";
 		return false;
 	}
 
