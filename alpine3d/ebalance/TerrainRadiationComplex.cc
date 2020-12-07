@@ -204,7 +204,6 @@ void TerrainRadiationComplex::initViewList()
 	ViewList.resize(dimx, dimy, 2, S, {0, 0, 0, 0, 0});
 
 	int counter = 0; // For output bar
-	Vec3D projected_ray, z_axis = {0, 0, 1};
 //loop over all triangles of surface
 #pragma omp parallel for
 	for (size_t ii = 1; ii < dimx - 1; ++ii)
@@ -230,7 +229,7 @@ void TerrainRadiationComplex::initViewList()
 					{
 						throw IndexOutOfBoundsException("Expected array of size 3");
 					}
-					Vec3D ray_arr;
+					Vec3D ray_arr, projected_ray, z_axis = {0, 0, 1};
 					std::copy_n(ray.begin(), ray_arr.size(), ray_arr.begin());
 					ProjectVectorToPlane(ray_arr, z_axis, projected_ray); // [in MT 2.1.3:  projected_ray ~ v_view,yx]
 					if (NormOfVector(projected_ray) != 0)
@@ -865,13 +864,13 @@ void TerrainRadiationComplex::TriangleNormal(size_t ii_dem, size_t jj_dem, int w
 	{
 		Vec3D e_x = {-cellsize, 0, dem(ii_dem - 1, jj_dem) - dem(ii_dem, jj_dem)}; //[MT eq. 2.17]
 		Vec3D e_y = {0, cellsize, dem(ii_dem, jj_dem + 1) - dem(ii_dem, jj_dem)};  //[MT eq. 2.18]
-		VectorCrossProduct(e_y, e_x, n);																			  //[MT eq. 2.21]
+		VectorCrossProduct(e_y, e_x, n);										   //[MT eq. 2.21]
 	}
 	else
 	{
 		Vec3D e_x = {cellsize, 0, dem(ii_dem + 1, jj_dem) - dem(ii_dem, jj_dem)};  //[MT eq. 2.19]
 		Vec3D e_y = {0, -cellsize, dem(ii_dem, jj_dem - 1) - dem(ii_dem, jj_dem)}; //[MT eq. 2.20]
-		VectorCrossProduct(e_y, e_x, n);																			  //[MT eq. 2.21]
+		VectorCrossProduct(e_y, e_x, n);										   //[MT eq. 2.21]
 	}
 
 	return normalizeVector(n, v_out);
@@ -921,7 +920,7 @@ double TerrainRadiationComplex::IntersectionRayTriangle(Vec3D &v_view, size_t mm
 		return -999; // Must hit frontal
 
 	Vec3D aufpunkt_ray = {mm * cellsize, nn * cellsize, dem(mm, nn) + 0.01}; // 0.01 : Place Basic Set slightly above surface to prevent trivial intersections with itself
-	Vec3D balance_point_par = {ii * cellsize, jj * cellsize, dem(ii, jj)};	// [ ~MT eq. 2.22]
+	Vec3D balance_point_par = {ii * cellsize, jj * cellsize, dem(ii, jj)};	 // [ ~MT eq. 2.22]
 	Vec3D v_diff;
 	VectorDifference(aufpunkt_ray, balance_point_par, v_diff);
 	P_3 = VectorScalarProduct(v_diff, n); // nominator in rhs of [MT eq. 2.25]
@@ -1112,7 +1111,7 @@ void TerrainRadiationComplex::normalizeVector(Vec3D &vec1, Vec3D &v_out)
 	double norm = NormOfVector(vec1);
 	if (norm == 0)
 	{
-		std::cout << "Exception in TerrainRadiationComplex::normalizeVector : norm is zero\n";
+		std::cout << "Exception in TerrainRadiationComplex::normalizeVector : norm of (" << vec1[0] << ", " << vec1[1] << ", " << vec1[2] << ") is zero\n";
 		return;
 	}
 
