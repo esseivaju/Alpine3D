@@ -553,6 +553,7 @@ bool TerrainRadiationComplex::ReadViewList()
 */
 void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, mio::Array2D<double> &diffuse, mio::Array2D<double> &terrain, mio::Array2D<double> &direct_unshaded_horizontal)
 {
+	MPIControl &mpicontrol = MPIControl::instance();
 
 	// Special T_Lists for Radation analysis
 	mio::Array4D<double> TList_ms_old(dimx, dimy, 2, S, 0), TList_ms_new(dimx, dimy, 2, S, 0); // Total reflected radiance (W/m2/sr)  for all Vectors of basic set and all triangles of DEM
@@ -577,8 +578,13 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, m
 
 // Calculate [MT eq. 2.96] and all Elements thereof
 #pragma omp parallel for
-	for (size_t ii = 1; ii < dimx - 1; ++ii)
+	for (size_t ii = startx; ii < endx; ++ii)
 	{
+		//stop condition for mpi process working on the last slice
+		if (ii >= dimx - 1)
+		{
+			continue;
+		}
 		for (size_t jj = 1; jj < dimy - 1; ++jj)
 		{
 			//////////////////////////////////
@@ -709,8 +715,12 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, m
 		terrain_flux_new.resize(dimx, dimy, 2, 0.);
 
 #pragma omp parallel for
-		for (size_t ii = 1; ii < dimx - 1; ++ii)
+		for (size_t ii = startx; ii < endx; ++ii)
 		{
+			if (ii >= dimx - 1)
+			{
+				continue;
+			}
 			for (size_t jj = 1; jj < dimy - 1; ++jj)
 			{
 				double albedo_temp = albedo_grid(ii, jj);
@@ -775,8 +785,12 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, m
 		terrain_flux_new.resize(dimx, dimy, 2, 0.);
 
 #pragma omp parallel for
-		for (size_t ii = 1; ii < dimx - 1; ++ii)
+		for (size_t ii = startx; ii < endx; ++ii)
 		{
+			if (ii >= dimx - 1)
+			{
+				continue;
+			}
 			for (size_t jj = 1; jj < dimy - 1; ++jj)
 			{
 				double albedo_temp = albedo_grid(ii, jj);
@@ -829,14 +843,19 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, m
 
 // Average both triangles to one DEM-Gridpoint-Value for further Alpine3D use
 #pragma omp parallel for
-	for (size_t ii = 1; ii < dimx - 1; ++ii)
+	for (size_t ii = startx; ii < endx; ++ii)
 	{
+		if (ii >= dimx - 1)
+		{
+			continue;
+		}
 		for (size_t jj = 1; jj < dimy - 1; ++jj)
 		{
 			terrain_temp(ii, jj) = (terrain_flux_new(ii, jj, 1) + terrain_flux_new(ii, jj, 0)) / 2.;
 		}
 	}
-
+	mpicontrol.allreduce_sum(diffuse_temp);
+	mpicontrol.allreduce_sum(terrain_temp);
 	diffuse = diffuse_temp;
 	terrain = terrain_temp;
 
@@ -1080,8 +1099,11 @@ double TerrainRadiationComplex::TerrainBiggestDifference(mio::Array3D<double> te
 
 	double max_diff = 0, diff;
 
-	for (size_t ii = 1; ii < dimx - 1; ++ii)
+	for (size_t ii = startx; ii < endx; ++ii)
 	{
+		if (ii >= dimx -1) {
+			continue;
+		}
 		for (size_t jj = 1; jj < dimy - 1; ++jj)
 		{
 			for (size_t which_triangle = 0; which_triangle < 2; ++which_triangle) // Triangles: A=1, B=0  [MT Figure 2.2]
