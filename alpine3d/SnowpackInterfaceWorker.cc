@@ -224,7 +224,6 @@ void SnowpackInterfaceWorker::initGrids(std::vector<std::string>& params,
                          grids_not_computed_in_worker.end(),
                          params[ii]);
     if(position<grids_not_computed_in_worker.end()) {
-      std::cout << "XXX parameter " << params[ii] << " ignored" << std::endl;
       continue;
     }
 		if (param_idx==IOUtils::npos)
