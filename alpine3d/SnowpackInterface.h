@@ -130,7 +130,8 @@ class Runoff; // forward declaration, cyclic header include
 		// Methods for accessing Snopack Interface Manager
 		SnowpackInterface(const mio::Config &io_cfg, const size_t& nbworkers,
 		                  const mio::DEMObject& dem_in,
-		                  const mio::Grid2DObject& landuse_in, const std::vector<mio::Coords>& vec_pts, const mio::Date& startTime, const std::string& grids_requirements, const bool is_restart_in);
+		                  const mio::Grid2DObject& landuse_in, const std::vector<mio::Coords>& vec_pts,
+                      const mio::Date& startTime, const std::string& grids_requirements, const bool is_restart_in);
 		SnowpackInterface(const SnowpackInterface&);
 		~SnowpackInterface();
 
@@ -168,6 +169,7 @@ class Runoff; // forward declaration, cyclic header include
 		mio::Grid2DObject getGrid(const SnGrids::Parameters& param) const;
 
 	private:
+    static const std::vector<std::string> grids_not_computed_in_worker;
 		std::string getGridsRequirements() const;
 		mio::Config readAndTweakConfig(const mio::Config& io_cfg,const bool have_pts);
 		bool do_grid_output(const mio::Date &date) const;

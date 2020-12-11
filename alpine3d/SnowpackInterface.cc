@@ -26,6 +26,22 @@
 using namespace std;
 using namespace mio;
 
+const std::vector<std::string> SnowpackInterface::grids_not_computed_in_worker{
+"TA",
+"RH",
+"VW",
+"DW",
+"PSUM",
+"PSUM_PH",
+"PSUM_TECH",
+"MNS",
+"ISWR",
+"ILWR",
+"ISWR_TERRAIN",
+"ILWR_TERRAIN",
+"ISWR_DIFF",
+"ISWR_DIR"};
+
 //sort the by increasing y and increasing x as a second key
 inline bool pair_comparator(const std::pair<double, double>& l, const std::pair<double, double>& r)
 {
@@ -199,7 +215,9 @@ SnowpackInterface::SnowpackInterface(const mio::Config& io_cfg, const size_t& nb
 		OMPControl::getArraySliceParams(mpi_nx, nbworkers, ii, omp_offset, omp_nx);
 		const size_t offset = mpi_offset + omp_offset;
 
-		workers[ii] = new SnowpackInterfaceWorker(sn_cfg, sub_dem, sub_landuse, sub_pts, thread_stations, thread_stations_coord, offset);
+		workers[ii] = new SnowpackInterfaceWorker(sn_cfg, sub_dem, sub_landuse, sub_pts,
+                                              thread_stations, thread_stations_coord,
+                                              offset, grids_not_computed_in_worker);
 
 		worker_startx[ii] = offset;
 		worker_deltax[ii] = omp_nx;

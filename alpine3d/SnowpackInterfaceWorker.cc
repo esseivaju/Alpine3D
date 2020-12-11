@@ -130,7 +130,8 @@ SnowpackInterfaceWorker::SnowpackInterfaceWorker(const mio::Config& io_cfg,
                                                  const std::vector< std::pair<size_t,size_t> >& pts_in,
                                                  const std::vector<SnowStation*>& snow_stations,
                                                  const std::vector<std::pair<size_t,size_t> >& snow_stations_coord,
-                                                 const size_t offset_in)
+                                                 const size_t offset_in,
+                                                 const std::vector<std::string>& grids_not_computed_in_worker)
  : sn_cfg(io_cfg), sn(sn_cfg), meteo(sn_cfg), stability(sn_cfg, false), sn_techsnow(sn_cfg), dem(dem_in),
    dimx(dem.getNx()), dimy(dem.getNy()),  offset(offset_in), SnowStations(snow_stations), SnowStationsCoord(snow_stations_coord),
    isSpecialPoint(snow_stations.size(), false), landuse(landuse_in), store(dem_in, 0.), grids(), snow_pixel(), meteo_pixel(),
@@ -161,7 +162,7 @@ SnowpackInterfaceWorker::SnowpackInterfaceWorker(const mio::Config& io_cfg,
 		params.push_back( "TSOIL"+mio::IOUtils::toString(ii+1) );
 	}
 	uniqueOutputGrids(params);
-	initGrids(params);
+	initGrids(params, grids_not_computed_in_worker);
 
 	const CurrentMeteo meteoPixel; //this is only necessary in order to have something for fillGrids()
 	const SurfaceFluxes surfaceFlux; //this is only necessary in order to have something for fillGrids()
@@ -212,12 +213,20 @@ void SnowpackInterfaceWorker::uniqueOutputGrids(std::vector<std::string>& output
 /** @brief Initialize and add to the grid map the requested grids
  * @param params string representation of the grids to add
  */
-void SnowpackInterfaceWorker::initGrids(std::vector<std::string>& params)
+void SnowpackInterfaceWorker::initGrids(std::vector<std::string>& params,
+                                        const std::vector<std::string>& grids_not_computed_in_worker)
 {
 	for (size_t ii = 0; ii<params.size(); ++ii) {
 		IOUtils::toUpper(params[ii]); //make sure all parameters are upper case
 
 		const size_t param_idx = SnGrids::getParameterIndex( params[ii] );
+    const auto position = std::find(grids_not_computed_in_worker.begin(),
+                         grids_not_computed_in_worker.end(),
+                         params[ii]);
+    if(position<grids_not_computed_in_worker.end()) {
+      std::cout << "XXX parameter " << params[ii] << " ignored" << std::endl;
+      continue;
+    }
 		if (param_idx==IOUtils::npos)
 			throw UnknownValueException("Unknow meteo grid '"+params[ii]+"' selected for gridded output", AT);
 
@@ -314,28 +323,10 @@ void SnowpackInterfaceWorker::fillGrids(const size_t& ii, const size_t& jj, cons
 	for (it=grids.begin(); it!=grids.end(); ++it) {
 		double value = IOUtils::nodata;
 		switch (it->first) {
-			case SnGrids::TA:
-				value = meteoPixel.ta; break;
-			case SnGrids::RH:
-				value = meteoPixel.rh; break;
-			case SnGrids::VW:
-				value = meteoPixel.vw; break;
-			case SnGrids::DW:
-				value = meteoPixel.dw; break;
-			case SnGrids::ISWR:
-				value = meteoPixel.iswr; break;
 			case SnGrids::ISWR_BELOW_CAN:
-				value = (useEBalance)? meteoPixel.iswr : IOUtils::nodata; break;
-			case SnGrids::ILWR:
-				value = Atmosphere::blkBody_Radiation(meteoPixel.ea, meteoPixel.ta); break;
+				value = (useEBalance && useCanopy)? meteoPixel.iswr : IOUtils::nodata; break;
 			case SnGrids::HS:
 				value = (snowPixel.cH - snowPixel.Ground) /  snowPixel.cos_sl; break; //slope2horiz
-			case SnGrids::PSUM:
-				value = meteoPixel.psum; break;
-			case SnGrids::PSUM_PH:
-				value = meteoPixel.psum_ph; break;
-			case SnGrids::PSUM_TECH:
-				value = meteoPixel.psum_tech; break;
 			case SnGrids::TSS:
 				if (!useCanopy || snowPixel.Cdata.zdispl < 0.) {
 					value = snowPixel.Ndata.back().T;
@@ -395,11 +386,6 @@ void SnowpackInterfaceWorker::fillGrids(const size_t& ii, const size_t& jj, cons
 					// Add part from Canopy
 					value += useCanopy?(snowPixel.Cdata.transp+snowPixel.Cdata.intevap)/snowPixel.cos_sl:0; //slope2horiz
 					break;
-      case SnGrids::ISWR_TERRAIN:
-      case SnGrids::ILWR_TERRAIN:
-      case SnGrids::ISWR_DIR:
-      case SnGrids::ISWR_DIFF:
-          break;
 			default:
 				if (it->first>=SnGrids::TSOIL1 && it->first<=SnGrids::lastparam) //dealing with soil temperatures
 				{
