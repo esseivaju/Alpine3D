@@ -68,7 +68,6 @@ bool SnGrids::initStaticData()
 	paramname.push_back("ET");
   paramname.push_back("ISWR_TERRAIN");
   paramname.push_back("ILWR_TERRAIN");
-  paramname.push_back("VIEW_FACTOR");
   paramname.push_back("ISWR_BELOW_CAN");
 	paramname.push_back("TSOIL1");
 	paramname.push_back("TSOIL2");

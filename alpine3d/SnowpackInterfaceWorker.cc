@@ -397,7 +397,6 @@ void SnowpackInterfaceWorker::fillGrids(const size_t& ii, const size_t& jj, cons
 					break;
       case SnGrids::ISWR_TERRAIN:
       case SnGrids::ILWR_TERRAIN:
-      case SnGrids::VIEW_FACTOR:
       case SnGrids::ISWR_DIR:
       case SnGrids::ISWR_DIFF:
           break;

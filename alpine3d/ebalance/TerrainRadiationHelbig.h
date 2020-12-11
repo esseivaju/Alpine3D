@@ -19,6 +19,7 @@
 #define TERRAINRADIATIONHELBIG_H
 
 #include <meteoio/MeteoIO.h>
+#include <alpine3d/MPIControl.h>
 #include <alpine3d/ebalance/TerrainRadiationAlgorithm.h>
 #include <alpine3d/ebalance/VFSymetricMatrix.h>
 #include <alpine3d/ebalance/ViewFactorsHelbig.h>

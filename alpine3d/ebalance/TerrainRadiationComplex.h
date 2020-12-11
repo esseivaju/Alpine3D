@@ -25,6 +25,7 @@
 #include <alpine3d/ebalance/RadiationField.h>
 #include <alpine3d/ebalance/SolarPanel.h>
 #include <alpine3d/ebalance/SnowBRDF.h>
+#include <alpine3d/MPIControl.h>
 
 
 /**

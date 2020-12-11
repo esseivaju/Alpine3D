@@ -70,7 +70,19 @@ TerrainRadiationComplex::TerrainRadiationComplex(const mio::Config& cfg_in, cons
 	initSortList();
   initSkyViewFactor();
 	if (if_write_view_list) WriteViewList();									// Write ViewList to file
-	if (cfg.keyExists("PVPFILE", "EBalance")) PVobject->initTerrain(M_epsilon, M_phi);	// Link SolarPanel-object to ViewList
+
+	if (cfg_in.keyExists("PVPFILE", "EBalance")) PVobject->initTerrain(M_epsilon, M_phi);	// Link SolarPanel-object to ViewList
+
+  bool write_sky_vf=false;
+  cfg.getValue("WRITE_SKY_VIEW_FACTOR", "output", write_sky_vf,IOUtils::nothrow);
+
+  if(MPIControl::instance().master() && write_sky_vf){
+    std::cout << "[i] Writing sky view factor grid" << std::endl;
+    mio::Array2D<double> sky_vf(dimx,dimy);
+    getSkyViewFactor(sky_vf);
+    mio::IOManager io(cfg_in);
+    io.write2DGrid(mio::Grid2DObject(dem_in.cellsize,dem_in.llcorner,sky_vf), "SKY_VIEW_FACTOR");
+  }
 
 }
 

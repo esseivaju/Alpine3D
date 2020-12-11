@@ -38,7 +38,7 @@ TerrainRadiationAlgorithm* TerrainRadiationFactory::getAlgorithm(const Config& c
 	IOUtils::toUpper(method);
 
 	if (method == "SIMPLE") {
-		return new TerrainRadiationSimple(dem, method);
+		return new TerrainRadiationSimple(cfg, dem, method);
 	} else if (method == "HELBIG") {
 		return new TerrainRadiationHelbig(cfg, dem, nbworkers, method);
 	} else if (method == "COMPLEX") {

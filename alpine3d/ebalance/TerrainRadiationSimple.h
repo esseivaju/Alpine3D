@@ -37,7 +37,7 @@
 class TerrainRadiationSimple : public TerrainRadiationAlgorithm {
 
 	public:
-		TerrainRadiationSimple(const mio::DEMObject &dem_in, const std::string& method);
+		TerrainRadiationSimple(const mio::Config& i_cfg, const mio::DEMObject &dem_in, const std::string& method);
 		~TerrainRadiationSimple();
 
 		void getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse, mio::Array2D<double>& terrain,

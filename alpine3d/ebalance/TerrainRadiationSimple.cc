@@ -20,7 +20,7 @@
 
 using namespace mio;
 
-TerrainRadiationSimple::TerrainRadiationSimple(const mio::DEMObject& dem_in, const std::string& method)
+TerrainRadiationSimple::TerrainRadiationSimple(const mio::Config& i_cfg, const mio::DEMObject& dem_in, const std::string& method)
 					  : TerrainRadiationAlgorithm(method),
 						albedo_grid(dem_in.getNx(), dem_in.getNy(), IOUtils::nodata), sky_vf(dem_in.getNx(), dem_in.getNy(), IOUtils::nodata),
 						dimx(dem_in.getNx()), dimy(dem_in.getNy()), startx(0), endx(dimx)
@@ -31,6 +31,16 @@ TerrainRadiationSimple::TerrainRadiationSimple(const mio::DEMObject& dem_in, con
 	endx = startx + nx;
 
 	initSkyViewFactor(dem_in);
+
+  bool write_sky_vf=false;
+  i_cfg.getValue("WRITE_SKY_VIEW_FACTOR", "output", write_sky_vf,IOUtils::nothrow);
+
+  if(MPIControl::instance().master() && write_sky_vf){
+    std::cout << "[i] Writing sky view factor grid" << std::endl;
+    mio::IOManager io(i_cfg);
+    io.write2DGrid(mio::Grid2DObject(dem_in.cellsize,dem_in.llcorner,sky_vf), "SKY_VIEW_FACTOR");
+  }
+
 }
 
 TerrainRadiationSimple::~TerrainRadiationSimple() {}

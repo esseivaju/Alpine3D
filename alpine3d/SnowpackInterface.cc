@@ -128,10 +128,6 @@ SnowpackInterface::SnowpackInterface(const mio::Config& io_cfg, const size_t& nb
 	//create and prepare  the vector of output grids
 	if (grids_write) {
 		sn_cfg.getValue("GRIDS_PARAMETERS", "output", output_grids);
-    for(auto& o:output_grids)
-    {
-      std::cout << o << std::endl;
-    }
 		std::vector<double> soil_temp_depths;
 		sn_cfg.getValue("SOIL_TEMPERATURE_DEPTHS", "Output", soil_temp_depths, IOUtils::nothrow);
 		const unsigned short max_Tsoil( SnGrids::lastparam - SnGrids::TSOIL1 + 1 );
@@ -742,8 +738,6 @@ mio::Grid2DObject SnowpackInterface::getGrid(const SnGrids::Parameters& param) c
       return terrain_shortwave;
     case SnGrids::ILWR_TERRAIN:
       return terrain_longwave;
-    case SnGrids::VIEW_FACTOR:
-      return view_factor;
     case SnGrids::ISWR_DIFF:
 		  return diffuse;
 		case SnGrids::ISWR_DIR:

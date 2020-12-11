@@ -52,6 +52,17 @@ TerrainRadiationHelbig::TerrainRadiationHelbig(const mio::Config& cfg, const mio
 	lw_sky.resize( dimx, dimy );
 
 	LW_distance_index = (int)ceil(lw_radius / cellsize);
+
+  bool write_sky_vf=false;
+  cfg.getValue("WRITE_SKY_VIEW_FACTOR", "output", write_sky_vf,IOUtils::nothrow);
+
+  if(MPIControl::instance().master() && write_sky_vf){
+    std::cout << "[i] Writing sky view factor grid" << std::endl;
+    mio::Array2D<double> sky_vf(dimx,dimy);
+    getSkyViewFactor(sky_vf);
+    mio::IOManager io(cfg);
+    io.write2DGrid(mio::Grid2DObject(dem_in.cellsize,dem_in.llcorner,sky_vf), "SKY_VIEW_FACTOR");
+  }
 }
 
 void TerrainRadiationHelbig::getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse,
