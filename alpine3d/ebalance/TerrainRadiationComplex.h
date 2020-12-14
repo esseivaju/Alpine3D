@@ -25,29 +25,30 @@
 #include <alpine3d/ebalance/RadiationField.h>
 #include <alpine3d/ebalance/SolarPanel.h>
 #include <alpine3d/ebalance/SnowBRDF.h>
+#include <alpine3d/MPIControl.h>
 
 
 /**
  * @page TerrainRadiationComplex
 
- * This module calculates the radiative transfer of SW radiation in snow-covered terrain. It can take into account anisotropic reflection 
- * of light on snow (forward scattering) and multiple reflections in the terrain. The price for this complexity is high: 
- * The initialization time is extremely long (for a DEM with 30'000 pixels it can be 12 hours. However, if a ViewList-file is generated 
- * during the initialization, it can be bypassed in later simulations. ) In the main computation loop, the effort is considerable too 
- * and may dominate the simulation time in many cases. Therefore, this module is recommended for explicit radiation investigations based 
- * on relatively small, high-resolution DEM's. It can also be coupled to the SolarPanel-module for precise simulation of radiation on 
- * photovoltaic panels. 
- * The algorithm is described in the master thesis of Felix von Rütte, entitled "Radiative Transfer Model for Snowy Mountains". In the 
- * comments is often referred to by the abbreviation "MT". If you don't find a version online, ask Michael Lehning, he was the supervisor. 
+ * This module calculates the radiative transfer of SW radiation in snow-covered terrain. It can take into account anisotropic reflection
+ * of light on snow (forward scattering) and multiple reflections in the terrain. The price for this complexity is high:
+ * The initialization time is extremely long (for a DEM with 30'000 pixels it can be 12 hours. However, if a ViewList-file is generated
+ * during the initialization, it can be bypassed in later simulations. ) In the main computation loop, the effort is considerable too
+ * and may dominate the simulation time in many cases. Therefore, this module is recommended for explicit radiation investigations based
+ * on relatively small, high-resolution DEM's. It can also be coupled to the SolarPanel-module for precise simulation of radiation on
+ * photovoltaic panels.
+ * The algorithm is described in the master thesis of Felix von Rütte, entitled "Radiative Transfer Model for Snowy Mountains". In the
+ * comments is often referred to by the abbreviation "MT". If you don't find a version online, ask Michael Lehning, he was the supervisor.
  *
  * @keys in io-file
  * COMPLEX_ANISOTROPY [true or false] 		: Whether a snow BRDF should be included. False means isotropic scattering.
- * COMPLEX_MULTIPLE [true or false]			: Whether multiple scattering in the terrain should be taken into account. 
+ * COMPLEX_MULTIPLE [true or false]			: Whether multiple scattering in the terrain should be taken into account.
  * COMPLEX_WRITE_VIEWLIST [true or false]	: Whether the initialization stuff should be written to file. (Make sure you have folder "output")
  * COMPLEX_READ_VIEWLIST [true or false]	: Whether an existing initialization file should be read in; bypassing the initialization.
  * COMPLEX_VIEWLISTFILE [<path>/<filename>]	: Path to the ViewList file if existing. (e.g ../input/surface-grids/ViewList_Totalp_30x30.rad)
  *
- * 
+ *
  *
  * @code
  * [EBalance]
@@ -71,9 +72,10 @@ class TerrainRadiationComplex : public TerrainRadiationAlgorithm {
 		TerrainRadiationComplex(const mio::Config& cfg, const mio::DEMObject &dem_in, const std::string& method, const RadiationField* radfield, SolarPanel* PVobject_in);
 		~TerrainRadiationComplex();
 
-		void getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse, mio::Array2D<double>& terrain, mio::Array2D<double>& direct_unshaded_horizontal);
+		void getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse,
+                      mio::Array2D<double>& terrain, mio::Array2D<double>& direct_unshaded_horizontal,
+                      mio::Array2D<double>& view_factor);
 		void setMeteo(const mio::Array2D<double>& albedo, const mio::Array2D<double>& ta, const mio::Array2D<double>& rh,const mio::Array2D<double>& ilwr);
-		
 
 	private:
 
@@ -90,9 +92,12 @@ class TerrainRadiationComplex : public TerrainRadiationAlgorithm {
 		// auxiliary functions
 		std::vector<double> TriangleNormal(size_t ii_dem, size_t jj_dem, int which_triangle);
 		double IntersectionRayTriangle(std::vector<double> ray, size_t ii_0, size_t jj_0, size_t ii_dem, size_t jj_dem, size_t which_triangle);
-		size_t vectorToSPixel(std::vector<double> vec_in, size_t ii_dem, size_t jj_dem, int which_triangle);
-		double getLandViewFactor(size_t ii_dem, size_t jj_dem, int which_triangle);
-		double getSkyViewFactor(size_t ii_dem, size_t jj_dem, int which_triangle);
+		size_t vectorToSPixel(std::vector<double> vec_in, size_t ii_dem, size_t jj_dem, size_t which_triangle);
+		double getLandViewFactor(size_t ii_dem, size_t jj_dem, size_t which_triangle);
+    void initSkyViewFactor();
+    double computeSkyViewFactor(size_t ii_dem, size_t jj_dem, size_t which_triangle);
+		double getSkyViewFactor(size_t ii_dem, size_t jj_dem, size_t which_triangle);
+    void getSkyViewFactor(mio::Array2D<double> &o_sky_vf);
 		std::vector<double> getVectorSun(double solarAzimuth,double solarElevation);
 		double TerrainBiggestDifference(mio::Array3D<double> terrain_old, mio::Array3D<double> terrain_new);
 
@@ -115,13 +120,13 @@ class TerrainRadiationComplex : public TerrainRadiationAlgorithm {
 
 
 		// Variables
-		const size_t dimx, dimy;		
+		const size_t dimx, dimy;
 		mio::DEMObject dem;
 		const mio::Config& cfg;
 
 		SnowBRDF BRDFobject;
 		const RadiationField* radobject;
-		SolarPanel* PVobject;	
+		SolarPanel* PVobject;
 
 		mio::Array3D<std::vector<double> > SortList;				// Used for speedup in Terrain Iterations
 		std::vector< std::vector<double> > BasicSet_Horizontal; 	// Horizontal Basic Set [MT 2.1.1 Basic Set]
@@ -129,7 +134,8 @@ class TerrainRadiationComplex : public TerrainRadiationAlgorithm {
 		mio::Array4D<std::vector<double> > ViewList;				// Stores all information of network between pixels [MT 2.1.3 View List, eq. 2.47]
 		mio::Array2D<double> RList; 								// List pre-storage of BRDF values
 		mio::Array2D<double> albedo_grid;							// Albedo value for each square Pixel
-
+    mio::Array2D<double> sky_vf_mean; // Grid to store view factor
+    std::vector< mio::Array2D<double> > sky_vf;// Array to stor grid of view factor for both values of which_triangle
 		unsigned int M_epsilon;				// Number of small circles in Basic Set [MT fig. 2.1]
 		unsigned int M_phi;					// Number of vectors per small circle of Basic Set [MT fig. 2.1]
 		unsigned int S;						// Number of vectors per Basic Set [MT fig. 2.1]
@@ -137,8 +143,8 @@ class TerrainRadiationComplex : public TerrainRadiationAlgorithm {
 
 		// Keys from io-file
 		bool if_anisotropy=false; 			// Anisotropic or Isotropic Snow Model ?
-		bool if_multiple=false;				// Do Multiple Scattering in Terrain or not ? 
-		bool if_write_view_list=true;		// Write ViewList to file ? 
+		bool if_multiple=false;				// Do Multiple Scattering in Terrain or not ?
+		bool if_write_view_list=true;		// Write ViewList to file ?
 		bool if_read_view_list=false;		// Read existing View-list file? -> Speeds up Initialisation by factor ~200
 };
 

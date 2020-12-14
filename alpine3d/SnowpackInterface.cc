@@ -26,6 +26,22 @@
 using namespace std;
 using namespace mio;
 
+const std::vector<std::string> SnowpackInterface::grids_not_computed_in_worker{
+"TA",
+"RH",
+"VW",
+"DW",
+"PSUM",
+"PSUM_PH",
+"PSUM_TECH",
+"MNS",
+"ISWR",
+"ILWR",
+"ISWR_TERRAIN",
+"ILWR_TERRAIN",
+"ISWR_DIFF",
+"ISWR_DIR"};
+
 //sort the by increasing y and increasing x as a second key
 inline bool pair_comparator(const std::pair<double, double>& l, const std::pair<double, double>& r)
 {
@@ -88,6 +104,7 @@ SnowpackInterface::SnowpackInterface(const mio::Config& io_cfg, const size_t& nb
                   meteo_outpath(), outpath(), mask_glaciers(false), mask_dynamic(false), maskGlacier(), tz_out(0.),
                   sn_cfg(readAndTweakConfig(io_cfg, !pts.empty())), snowpackIO(sn_cfg), dimx(dem_in.getNx()), dimy(dem_in.getNy()), mpi_offset(0), mpi_nx(dimx),
                   landuse(landuse_in), mns(dem_in, IOUtils::nodata), shortwave(dem_in, IOUtils::nodata), longwave(dem_in, IOUtils::nodata), diffuse(dem_in, IOUtils::nodata),
+                  view_factor(dem_in, IOUtils::nodata), terrain_shortwave(dem_in, IOUtils::nodata), terrain_longwave(dem_in, IOUtils::nodata),
                   psum(dem_in, IOUtils::nodata), psum_ph(dem_in, IOUtils::nodata), psum_tech(dem_in, IOUtils::nodata), grooming(dem_in, IOUtils::nodata),
                   vw(dem_in, IOUtils::nodata), dw(dem_in, IOUtils::nodata), rh(dem_in, IOUtils::nodata), ta(dem_in, IOUtils::nodata), init_glaciers_height(dem_in, IOUtils::nodata),
                   solarElevation(0.), output_grids(), workers(nbworkers), worker_startx(nbworkers), worker_deltax(nbworkers), worker_stations_coord(nbworkers),
@@ -116,6 +133,16 @@ SnowpackInterface::SnowpackInterface(const mio::Config& io_cfg, const size_t& nb
 	readInitalSnowCover(snow_stations,snow_stations_coord);
 
 	if (mpicontrol.master()) {
+
+    bool write_dem_details=false;
+    io_cfg.getValue("WRITE_DEM_DETAILS", "output", write_dem_details,IOUtils::nothrow);
+    if(write_dem_details){
+      std::cout << "[i] Writing DEM details grids" << std::endl;
+      io.write2DGrid(mio::Grid2DObject(dem.cellsize,dem.llcorner,dem.slope), "DEM_SLOPE");
+      io.write2DGrid(mio::Grid2DObject(dem.cellsize,dem.llcorner,dem.azi), "DEM_AZI");
+      io.write2DGrid(mio::Grid2DObject(dem.cellsize,dem.llcorner,dem.curvature), "DEM_CURVATURE");
+    }
+
 		std::cout << "[i] SnowpackInterface initializing a total of " << mpicontrol.size();
 		if (mpicontrol.size()>1) std::cout << " processes with " << nbworkers;
 		else std::cout << " process with " << nbworkers;
@@ -198,7 +225,9 @@ SnowpackInterface::SnowpackInterface(const mio::Config& io_cfg, const size_t& nb
 		OMPControl::getArraySliceParams(mpi_nx, nbworkers, ii, omp_offset, omp_nx);
 		const size_t offset = mpi_offset + omp_offset;
 
-		workers[ii] = new SnowpackInterfaceWorker(sn_cfg, sub_dem, sub_landuse, sub_pts, thread_stations, thread_stations_coord, offset);
+		workers[ii] = new SnowpackInterfaceWorker(sn_cfg, sub_dem, sub_landuse, sub_pts,
+                                              thread_stations, thread_stations_coord,
+                                              offset, grids_not_computed_in_worker);
 
 		worker_startx[ii] = offset;
 		worker_deltax[ii] = omp_nx;
@@ -245,6 +274,9 @@ SnowpackInterface& SnowpackInterface::operator=(const SnowpackInterface& source)
 		shortwave = source.shortwave;
 		longwave = source.longwave;
 		diffuse = source.diffuse;
+    view_factor = source.view_factor;
+    terrain_shortwave = source.terrain_shortwave;
+    terrain_longwave = source.terrain_longwave;
 		psum = source.psum;
 		psum_ph = source.psum_ph;
 		psum_tech = source.psum_tech;
@@ -674,7 +706,11 @@ void SnowpackInterface::setMeteo(const Grid2DObject& new_psum, const Grid2DObjec
  * @param solarElevation_in double of Solar elevation to be used for Canopy (in dec)
  * @param timestamp is the time of the calculation step from which this new values are comming
  */
-void SnowpackInterface::setRadiationComponents(const mio::Array2D<double>& shortwave_in, const mio::Array2D<double>& longwave_in, const mio::Array2D<double>& diff_in, const double& solarElevation_in, const mio::Date& timestamp)
+void SnowpackInterface::setRadiationComponents(const mio::Array2D<double>& shortwave_in,
+     const mio::Array2D<double>& longwave_in, const mio::Array2D<double>& diff_in,
+     const mio::Array2D<double>& view_factor_in, const mio::Array2D<double>& terrain_shortwave_in,
+     const mio::Array2D<double>& terrain_longwave_in,
+     const double& solarElevation_in, const mio::Date& timestamp)
 {
 	if (nextStepTimestamp != timestamp) {
 		if (MPIControl::instance().master()) {
@@ -687,6 +723,10 @@ void SnowpackInterface::setRadiationComponents(const mio::Array2D<double>& short
 	shortwave.grid2D = shortwave_in;
 	longwave.grid2D = longwave_in;
 	diffuse.grid2D = diff_in;
+  view_factor.grid2D = view_factor_in;
+  terrain_shortwave.grid2D = terrain_shortwave_in;
+  terrain_longwave.grid2D = terrain_longwave_in;
+
 	solarElevation = solarElevation_in;
 
 	dataRadiation = true;
@@ -722,6 +762,14 @@ mio::Grid2DObject SnowpackInterface::getGrid(const SnGrids::Parameters& param) c
 			return shortwave;
 		case SnGrids::ILWR:
 			return longwave;
+    case SnGrids::ISWR_TERRAIN:
+      return terrain_shortwave;
+    case SnGrids::ILWR_TERRAIN:
+      return terrain_longwave;
+    case SnGrids::ISWR_DIFF:
+		  return diffuse;
+		case SnGrids::ISWR_DIR:
+			return shortwave-diffuse-terrain_shortwave;
 		default: ; //so compilers do not complain about missing conditions
 	}
 

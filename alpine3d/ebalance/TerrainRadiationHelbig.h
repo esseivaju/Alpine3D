@@ -19,6 +19,7 @@
 #define TERRAINRADIATIONHELBIG_H
 
 #include <meteoio/MeteoIO.h>
+#include <alpine3d/MPIControl.h>
 #include <alpine3d/ebalance/TerrainRadiationAlgorithm.h>
 #include <alpine3d/ebalance/VFSymetricMatrix.h>
 #include <alpine3d/ebalance/ViewFactorsHelbig.h>
@@ -76,7 +77,8 @@ class TerrainRadiationHelbig: public TerrainRadiationAlgorithm {
 	public:
 		TerrainRadiationHelbig(const mio::Config& i_cfg, const mio::DEMObject& dem_in, const int& i_nbworkers, const std::string& method);
 
-		void getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse, mio::Array2D<double>& terrain, mio::Array2D<double>& direct_unshaded_horizontal);
+		void getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse, mio::Array2D<double>& terrain,
+                      mio::Array2D<double>& direct_unshaded_horizontal, mio::Array2D<double>& view_factor);
 		void setMeteo(const mio::Array2D<double>& albedo, const mio::Array2D<double>& ta,
 		              const mio::Array2D<double>& rh, const mio::Array2D<double>& ilwr);
 
@@ -104,7 +106,7 @@ class TerrainRadiationHelbig: public TerrainRadiationAlgorithm {
 		double itEps_LW;
 		double max_alb;              // max ground albedo
 
-		mio::Array2D<double> total_diff, tdir, tdiff, sw_t, glob_start, glob_h_isovf, glob_h, t_snowold;
+		mio::Array2D<double> total_diff, tdir, tdiff, sw_t, glob_start, glob_h_isovf, glob_h, t_snowold, total_terrain;
 		//SnowpackInterface *snowpack;
 
 		double lw_start_l1;
@@ -122,16 +124,17 @@ class TerrainRadiationHelbig: public TerrainRadiationAlgorithm {
 		std::vector<CellsList> lwt_byCell;
 
 		void Compute();
-		int SWTerrainRadiationStep(const double threshold_itEps_SW, int *c, int *d, unsigned int n, const clock_t t0);
+		int SWTerrainRadiationStep(const double threshold_itEps_SW, int &c, int &d, unsigned int n, const clock_t t0);
 		int LWTerrainRadiationStep(const double threshold_itEps_LW, const int itMax_LW, const int i_shoot, const int j_shoot, unsigned int n, const clock_t t0);
-		int ComputeTerrainRadiation(const bool& day, int c, int d);
+		void ComputeTerrainRadiation(const bool& day, int i_max_unshoot, int j_max_unshoot );
 		void ComputeRadiationBalance();
-		void InitializeTerrainSwSplitting(const int& i, const int& j,
-		                                  int *i_max_unshoot, int *j_max_unshoot, double *diffmax_sw);
-		void InitializeTerrainRadiation(const bool& day, int *c, int *d);
+		void InitializeTerrainSwSplitting(const int i, const int j,
+		                                  int& i_max_unshoot, int& j_max_unshoot, double& diffmax_sw);
+		void InitializeTerrainRadiation(const bool& day, int& i_max_unshoot, int& j_max_unshoot);
 		void fillSWResultsGrids(const bool& day);
 
 		void InitializeLW (const int i, const int j);
+    void getSkyViewFactor(mio::Array2D<double> &o_sky_vf);
 
 		static inline void CalculateIndex(const int indice, const int distance_max, int dim, int * min, int * max);
 		static inline void LWTerrainRadiationCore(const double bx2, const int j_shoot, const double z_shoot, const int j, const double z, const double cellsize, const double t_snow_shoot,const double t_snow_shoot_value ,const double t_a, const double vf, double * lwi, int * s);

@@ -20,7 +20,7 @@
 
 using namespace mio;
 
-TerrainRadiationSimple::TerrainRadiationSimple(const mio::DEMObject& dem_in, const std::string& method)
+TerrainRadiationSimple::TerrainRadiationSimple(const mio::Config& i_cfg, const mio::DEMObject& dem_in, const std::string& method)
 					  : TerrainRadiationAlgorithm(method),
 						albedo_grid(dem_in.getNx(), dem_in.getNy(), IOUtils::nodata), sky_vf(dem_in.getNx(), dem_in.getNy(), IOUtils::nodata),
 						dimx(dem_in.getNx()), dimy(dem_in.getNy()), startx(0), endx(dimx)
@@ -30,12 +30,25 @@ TerrainRadiationSimple::TerrainRadiationSimple(const mio::DEMObject& dem_in, con
 	MPIControl::instance().getArraySliceParams(dimx, startx, nx);
 	endx = startx + nx;
 
-	initSkyViewFactors(dem_in);
+	initSkyViewFactor(dem_in);
+
+  bool write_sky_vf=false;
+  i_cfg.getValue("WRITE_SKY_VIEW_FACTOR", "output", write_sky_vf,IOUtils::nothrow);
+
+  if(MPIControl::instance().master() && write_sky_vf){
+    std::cout << "[i] Writing sky view factor grid" << std::endl;
+    mio::IOManager io(i_cfg);
+    io.write2DGrid(mio::Grid2DObject(dem_in.cellsize,dem_in.llcorner,sky_vf), "SKY_VIEW_FACTOR");
+  }
+
 }
 
 TerrainRadiationSimple::~TerrainRadiationSimple() {}
 
-void TerrainRadiationSimple::getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse, mio::Array2D<double>& terrain, mio::Array2D<double>& direct_unshaded_horizontal)
+void TerrainRadiationSimple::getRadiation(const mio::Array2D<double>& direct,
+                                          mio::Array2D<double>& diffuse, mio::Array2D<double>& terrain,
+                                          mio::Array2D<double>& direct_unshaded_horizontal,
+                                          mio::Array2D<double>& view_factor)
 {
 	MPIControl& mpicontrol = MPIControl::instance();
 	terrain.resize(dimx, dimy, 0.);  //so allreduce_sum works properly when it sums full grids
@@ -65,6 +78,7 @@ void TerrainRadiationSimple::getRadiation(const mio::Array2D<double>& direct, mi
 	mpicontrol.allreduce_sum(terrain);
 	mpicontrol.allreduce_sum(diff_corr);
 	diffuse = diff_corr; //return the corrected diffuse radiation
+  getSkyViewFactor(view_factor);
 }
 
 //retrieve the albedo to use for terrain reflections
@@ -100,11 +114,11 @@ void TerrainRadiationSimple::setMeteo(const mio::Array2D<double>& albedo, const 
 	albedo_grid = albedo;
 }
 
-void TerrainRadiationSimple::getSkyViewFactor(mio::Array2D<double> &o_sky_vf) const {
+void TerrainRadiationSimple::getSkyViewFactor(mio::Array2D<double> &o_sky_vf) {
 	o_sky_vf = sky_vf;
 }
 
-void TerrainRadiationSimple::initSkyViewFactors(const mio::DEMObject &dem)
+void TerrainRadiationSimple::initSkyViewFactor(const mio::DEMObject &dem)
 {
 	#pragma omp parallel for collapse(2)
 	for (size_t jj=0; jj<dimy; jj++) {

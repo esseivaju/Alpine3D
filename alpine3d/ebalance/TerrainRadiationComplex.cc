@@ -18,15 +18,16 @@
 #include <alpine3d/ebalance/TerrainRadiationComplex.h>
 
 //file operations
-#include <iostream> 
-#include <fstream> 
+#include <iostream>
+#include <fstream>
 
 using namespace mio;
 
 
 TerrainRadiationComplex::TerrainRadiationComplex(const mio::Config& cfg_in, const mio::DEMObject& dem_in, const std::string& method, const RadiationField* radfield, SolarPanel* PVobject_in)
-                      : TerrainRadiationAlgorithm(method), dimx(dem_in.getNx()), dimy(dem_in.getNy()), dem(dem_in), cfg(cfg_in), BRDFobject(cfg_in), 
-                      radobject(radfield), PVobject(PVobject_in), albedo_grid(dem_in.getNx(), dem_in.getNy(), IOUtils::nodata)
+                      : TerrainRadiationAlgorithm(method), dimx(dem_in.getNx()), dimy(dem_in.getNy()), dem(dem_in), cfg(cfg_in), BRDFobject(cfg_in),
+                      radobject(radfield), PVobject(PVobject_in), albedo_grid(dem_in.getNx(), dem_in.getNy(), IOUtils::nodata),
+                      sky_vf(2, mio::Array2D<double>(dimx, dimy, IOUtils::nodata)), sky_vf_mean(dimx, dimy, IOUtils::nodata)
 {
 	// PRECISION PARAMETERS
 	// ####################
@@ -54,7 +55,7 @@ TerrainRadiationComplex::TerrainRadiationComplex(const mio::Config& cfg_in, cons
 		succesful_read=ReadViewList();
 		initBasicSetHorizontal();
 		initBasicSetRotated();
-	} 
+	}
 
 	// Initialise from scratch
 	if (!succesful_read){
@@ -67,10 +68,22 @@ TerrainRadiationComplex::TerrainRadiationComplex(const mio::Config& cfg_in, cons
 	// Initialise Speed-up
 	initRList();
 	initSortList();
-
+  initSkyViewFactor();
 	if (if_write_view_list) WriteViewList();									// Write ViewList to file
-	if (cfg.keyExists("PVPFILE", "EBalance")) PVobject->initTerrain(M_epsilon, M_phi);	// Link SolarPanel-object to ViewList
-	
+
+	if (cfg_in.keyExists("PVPFILE", "EBalance")) PVobject->initTerrain(M_epsilon, M_phi);	// Link SolarPanel-object to ViewList
+
+  bool write_sky_vf=false;
+  cfg.getValue("WRITE_SKY_VIEW_FACTOR", "output", write_sky_vf,IOUtils::nothrow);
+
+  if(MPIControl::instance().master() && write_sky_vf){
+    std::cout << "[i] Writing sky view factor grid" << std::endl;
+    mio::Array2D<double> sky_vf(dimx,dimy);
+    getSkyViewFactor(sky_vf);
+    mio::IOManager io(cfg_in);
+    io.write2DGrid(mio::Grid2DObject(dem_in.cellsize,dem_in.llcorner,sky_vf), "SKY_VIEW_FACTOR");
+  }
+
 }
 
 TerrainRadiationComplex::~TerrainRadiationComplex() {}
@@ -83,11 +96,11 @@ TerrainRadiationComplex::~TerrainRadiationComplex() {}
 /**
 * @brief Initializes set of Vectors that point to equal solid angels for horizontal hemisphere (BasicSet) [MT 2.1.1 Basic Set]
 * @param[in] -
-* @param[out] - 
-* 
+* @param[out] -
+*
 */
 void TerrainRadiationComplex::initBasicSetHorizontal(){
-	
+
 	double psi_0=0,psi_1=0,epsilon=0;
 	double delta=0;
 	double phi=0;
@@ -121,7 +134,7 @@ void TerrainRadiationComplex::initBasicSetHorizontal(){
 /**
 * @brief Rotates BasicSet in Plane of triangular Surface Object		[MT 2.1.3 View-List]
 * @param[in] -
-* @param[out] - 
+* @param[out] -
 *
 */
 void TerrainRadiationComplex::initBasicSetRotated(){
@@ -155,10 +168,10 @@ void TerrainRadiationComplex::initBasicSetRotated(){
 /**
 * @brief Assigns a pixel (or sky) to each space vector of each ProjectVectorToPlane		[MT 2.1.2 Surface Generation and 2.1.3 View-List]
 * @param[in] -
-* @param[out] - 
-*	
+* @param[out] -
+*
 */
-void TerrainRadiationComplex::initViewList(){	
+void TerrainRadiationComplex::initViewList(){
 
 	std::cout<<"[i] Initialize Terrain Radiation Complex\n";
 
@@ -184,9 +197,9 @@ void TerrainRadiationComplex::initViewList(){
 			 		size_t which_triangle_temp=9;
 				 	double distance, minimal_distance=dem.cellsize*(dem.getNx()+dem.getNy());
 
-				 	// Search for Intersection Candidates 
+				 	// Search for Intersection Candidates
 				 	size_t ii_dem=ii, jj_dem=jj, nb_cells=0;
-			 		std::vector<double> ray=BasicSet_rotated(ii,jj, which_triangle,solidangle); 
+			 		std::vector<double> ray=BasicSet_rotated(ii,jj, which_triangle,solidangle);
 		 			std::vector<double> projected_ray=ProjectVectorToPlane(ray, {0,0,1});					// [in MT 2.1.3:  projected_ray ~ v_view,yx]
 		 			if (NormOfVector(projected_ray) != 0 ) projected_ray=normalizeVector(projected_ray);
 					else projected_ray={1,0,0}; // if it goes straight up there will be sky (no caves for 2D DEM)
@@ -197,14 +210,14 @@ void TerrainRadiationComplex::initViewList(){
 						for (int k = -1; k < 2; ++k)
 						{
 							for (int kk = -1; kk < 2; ++kk)
-							{	
+							{
 
 								ii_dem = ii + (int)round( ((double)nb_cells)*projected_ray[0] ) + k;		// [~ MT eq. 2.32]
 								jj_dem = jj + (int)round( ((double)nb_cells)*projected_ray[1] ) + kk;		// [~ MT eq. 2.32]
 								if((ii_dem<1 || ii_dem>dem.getNx()-2 || jj_dem<1 || jj_dem>dem.getNy()-2)) continue;
 
-								distance=IntersectionRayTriangle(ray,ii,jj,ii_dem,jj_dem,0); // Triangles B: [MT Figure 2.2] 
-								if (distance!=-999 && distance<minimal_distance) 
+								distance=IntersectionRayTriangle(ray,ii,jj,ii_dem,jj_dem,0); // Triangles B: [MT Figure 2.2]
+								if (distance!=-999 && distance<minimal_distance)
 								{
 									minimal_distance=distance; // If intersection with sevaral trangles, take the closest intersection
 									ii_temp=ii_dem;
@@ -212,7 +225,7 @@ void TerrainRadiationComplex::initViewList(){
 									which_triangle_temp=0;
 								}
 
-								distance=IntersectionRayTriangle(ray,ii,jj,ii_dem,jj_dem,1); // Triangles A: [MT Figure 2.2] 
+								distance=IntersectionRayTriangle(ray,ii,jj,ii_dem,jj_dem,1); // Triangles A: [MT Figure 2.2]
 								if (distance!=-999 && distance<minimal_distance)
 								{
 									minimal_distance=distance; // If intersection with sevaral trangles, take the closest intersection
@@ -230,27 +243,27 @@ void TerrainRadiationComplex::initViewList(){
 
 					}
 					if (minimal_distance==dem.cellsize*(dem.getNx()+dem.getNy())) minimal_distance=-999; // No intersection found    =>    -999 == "SKY"
-					if (ii_temp>0 && ii_temp<dimx) solidangle_temp=vectorToSPixel(VectorStretch(ray,-1), ii_temp, jj_temp, which_triangle_temp); 
+					if (ii_temp>0 && ii_temp<dimx) solidangle_temp=vectorToSPixel(VectorStretch(ray,-1), ii_temp, jj_temp, which_triangle_temp);
 					ViewList(ii, jj, which_triangle, solidangle)={(double)ii_temp, (double)jj_temp, (double)which_triangle_temp, minimal_distance, (double)solidangle_temp}; // [MT eq. 2.47]
 				}
 				counter++;
 				if (counter%10==0) PrintProgress((double)counter/(double)(dimx-2)/(double)(dimy-2)/2.);
-				
+
 			}
 		}
 	}
 	PrintProgress(1);
 	std::cout<<"  Done.\n";
-	
-	
+
+
 }
 
 
 /**
-* @brief +SPEEDUP+ Projects BRDF on Basic Set. Instead of Calculating/Intrapolating all the time 
+* @brief +SPEEDUP+ Projects BRDF on Basic Set. Instead of Calculating/Intrapolating all the time
 * 					new BRDF factors, store discrete number covering whole hemisphere
 * @param[in] -
-* @param[out] - 
+* @param[out] -
 *
 */
 void TerrainRadiationComplex::initRList(){
@@ -273,16 +286,16 @@ void TerrainRadiationComplex::initRList(){
 
 			RList(number_solid_in, number_solid_out)=BRDFobject.get_RF(cth_i, cphi, cth_v);
 		}
-	}	
+	}
 }
 
 
 
 /**
-* @brief +SPEEDUP+: For most terrain a large part of the basicSet points in the sky. SortList Stores land-pointing vectors only. 
+* @brief +SPEEDUP+: For most terrain a large part of the basicSet points in the sky. SortList Stores land-pointing vectors only.
 * Only these need a iterative radiation computation. [not discussed in MT and somewhat confusing syntax in MT eq. 2.95, sorry. Better Look @ Paper ????]
 * @param[in] -
-* @param[out] - 
+* @param[out] -
 *
 */
 void TerrainRadiationComplex::initSortList(){
@@ -298,7 +311,7 @@ void TerrainRadiationComplex::initSortList(){
 			{
 				for (size_t solidangle = 0; solidangle < S; ++solidangle)
 				{
-					
+
 					double distance=ViewList(ii,jj,which_triangle, solidangle)[3];
 					if (distance==-999) continue;
 
@@ -322,7 +335,7 @@ void TerrainRadiationComplex::initSortList(){
 			for (size_t which_triangle = 0; which_triangle < 2; ++which_triangle) // Triangles: A=1, B=0  [MT Figure 2.2]
 			{
 				sort( SortList(ii, jj, which_triangle).begin(), SortList(ii, jj, which_triangle).end() );
-				SortList(ii, jj, which_triangle).erase( unique( SortList(ii, jj, which_triangle).begin(), SortList(ii, jj, which_triangle).end() ), SortList(ii, jj, which_triangle).end() ); 
+				SortList(ii, jj, which_triangle).erase( unique( SortList(ii, jj, which_triangle).begin(), SortList(ii, jj, which_triangle).end() ), SortList(ii, jj, which_triangle).end() );
 			}
 		}
 	}
@@ -331,7 +344,7 @@ void TerrainRadiationComplex::initSortList(){
 /**
 * @brief Writes Viewlist to file, use SMET format only
 * @param[in] -
-* @param[out] - 
+* @param[out] -
 *
 */
 void TerrainRadiationComplex::WriteViewList()
@@ -384,7 +397,7 @@ void TerrainRadiationComplex::WriteViewList()
 /**
 * @brief Reads ViewList from file, use SMET format only
 * @param[in] -
-* @param[out] - 
+* @param[out] -
 *
 */
 bool TerrainRadiationComplex::ReadViewList()
@@ -395,7 +408,7 @@ bool TerrainRadiationComplex::ReadViewList()
 		throw NotFoundException(filename, AT);
 		return false;
 	}
-	
+
 	smet::SMETReader myreader(filename);
 	std::vector<double> vec_data;
 	myreader.read(vec_data);
@@ -455,7 +468,7 @@ bool TerrainRadiationComplex::ReadViewList()
 	for (size_t ii=0; ii<vec_data.size(); ii+=nr_fields) {
 
 		ViewList(vec_data[ii+ii_fd], vec_data[ii+jj_fd], vec_data[ii+which_triangle_fd], vec_data[ii+solidangle_fd])={(double)vec_data[ii+ii_seen_fd], (double)vec_data[ii+jj_seen_fd], (double)vec_data[ii+which_triangle_seen_fd], vec_data[ii+distance_fd], (double)vec_data[ii+soldiangle_seen_fd]};
-			
+
 	}
 
 	std::cout<<"[i] TerrainRadiationComplex: Initialized "<<M_epsilon<<"x"<<M_phi<<" ViewList from file\n";
@@ -470,17 +483,18 @@ bool TerrainRadiationComplex::ReadViewList()
 
 
 /**
-* @brief Computes direct, diffuse and terrain radiation for each gridpoint. Terrain radiation 
+* @brief Computes direct, diffuse and terrain radiation for each gridpoint. Terrain radiation
 * @param[in] -
-* @param[out] - 
+* @param[out] -
 *
 */
-void TerrainRadiationComplex::getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse, mio::Array2D<double>& terrain, mio::Array2D<double>& direct_unshaded_horizontal)
+void TerrainRadiationComplex::getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse, mio::Array2D<double>& terrain,
+                                            mio::Array2D<double>& direct_unshaded_horizontal,mio::Array2D<double>& view_factor)
 {
 
 	// Special T_Lists for Radation analysis
 	mio::Array4D<double> TList_ms_old(dimx, dimy, 2, S, 0), TList_ms_new(dimx, dimy, 2, S, 0); 	// Total reflected radiance (W/m2/sr)  for all Vectors of basic set and all triangles of DEM
-	mio::Array4D<double> TList_sky_aniso(dimx, dimy, 2, S, 0); 									// Anisotropic single-scattered radiance from sun&sky (W/m2/sr) 
+	mio::Array4D<double> TList_sky_aniso(dimx, dimy, 2, S, 0); 									// Anisotropic single-scattered radiance from sun&sky (W/m2/sr)
 	mio::Array4D<double> TList_sky_iso(dimx, dimy, 2, S, 0);									// Isotropic single-scattered radiance from sun&sky (W/m2/sr)
 	mio::Array4D<double> TList_direct(dimx, dimy, 2, S, 0);										// Anisotropic single-scattered radiance only from direct solar (W/m2/sr), (used in SolarPanel-module for shadow)
 
@@ -504,7 +518,7 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double>& direct, m
 		for (size_t jj = 1; jj < dimy-1; ++jj)
 		{
 			//////////////////////////////////
-			///// DIRECT [in MT eq. 2.96: F_direct,t] 
+			///// DIRECT [in MT eq. 2.96: F_direct,t]
 			size_t solidangle_sun;
 			double distance_closest_triangle;
 
@@ -564,7 +578,7 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double>& direct, m
 
 
 
-			
+
 			for (size_t which_triangle = 0; which_triangle < 2; ++which_triangle) // Triangles: A=1, B=0  [MT Figure 2.2]
 			{
 				if (v_sun[2]<0) continue;  // might be to strict for Dawn..
@@ -577,7 +591,7 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double>& direct, m
 					diffuse_t = skydiffuse_B(ii,jj);
 					direct_t = direct_B(ii,jj);
 				}
- 
+
 
 
 				if (VectorScalarProduct(TriangleNormal(ii,jj,which_triangle),v_sun)>0)  solidangle_sun=vectorToSPixel(v_sun, ii, jj, which_triangle);
@@ -589,7 +603,7 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double>& direct, m
 					{
 						TList_sky_aniso(ii,jj,which_triangle, solidangle_out)=(direct_t+diffuse_t)*albedo_temp/Cst::PI;
 						TList_sky_iso(ii,jj,which_triangle, solidangle_out)=TList_sky_aniso(ii,jj,which_triangle, solidangle_out);
-						TList_direct(ii,jj,which_triangle, solidangle_out)=(direct_t)*albedo_temp/Cst::PI;						
+						TList_direct(ii,jj,which_triangle, solidangle_out)=(direct_t)*albedo_temp/Cst::PI;
 					}
 				}
 				else{
@@ -597,7 +611,7 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double>& direct, m
 					{
 						TList_sky_aniso(ii,jj,which_triangle, solidangle_out)=(RList(solidangle_sun, solidangle_out)*direct_t+diffuse_t)*albedo_temp/Cst::PI;
 						TList_sky_iso(ii,jj,which_triangle, solidangle_out)=(direct_t+diffuse_t)*albedo_temp/Cst::PI;
-						TList_direct(ii,jj,which_triangle, solidangle_out)=(RList(solidangle_sun, solidangle_out)*direct_t)*albedo_temp/Cst::PI;					
+						TList_direct(ii,jj,which_triangle, solidangle_out)=(RList(solidangle_sun, solidangle_out)*direct_t)*albedo_temp/Cst::PI;
 					}
 				}
 			}
@@ -617,7 +631,7 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double>& direct, m
 
 		TList_ms_old=TList_ms_new+TList_sky_aniso;
 		terrain_flux_old=terrain_flux_new;
-		
+
 
 		TList_ms_new.resize(dimx, dimy, 2, S, 0.);
 		terrain_flux_new.resize(dimx, dimy,2, 0.);
@@ -630,7 +644,7 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double>& direct, m
 				double albedo_temp=albedo_grid(ii,jj);
 
 				for (size_t which_triangle = 0; which_triangle < 2; ++which_triangle) // Triangles: A=1, B=0  [MT Figure 2.2]
-				{	
+				{
 					for (size_t solidangle_in = 0; solidangle_in < S; ++solidangle_in)
 					{
 						double Rad_solidangle;
@@ -648,7 +662,7 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double>& direct, m
 
 
 						Rad_solidangle=Rad_solidangle*albedo_temp/S;
-						
+
 						size_t solidangle_out=0;
 						// These are the most expensive loops... core of [MT eq. 2.97]
 						if (albedo_temp<0.5 || !if_anisotropy){
@@ -662,14 +676,14 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double>& direct, m
 							for (size_t kk = 0; kk < SortList(ii,jj,which_triangle).size(); ++kk)
 							{
 								solidangle_out=SortList(ii,jj,which_triangle)[kk];
-								TList_ms_new(ii,jj,which_triangle, solidangle_out)+=Rad_solidangle*RList(solidangle_in, solidangle_out);		
+								TList_ms_new(ii,jj,which_triangle, solidangle_out)+=Rad_solidangle*RList(solidangle_in, solidangle_out);
 							}
 						}
 					}
 				}
 			}
 		}
-		
+
 		// Test if convergence is below treshold [MT eq. 2.100]
 		if (number_rounds!=0 && TerrainBiggestDifference(terrain_flux_new, terrain_flux_old)<delta_F_max) another_round=0;
 		++number_rounds;
@@ -683,7 +697,7 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double>& direct, m
 	{
 		TList_ms_old=TList_ms_new+TList_sky_aniso;
 		terrain_flux_old=terrain_flux_new;
-			
+
 		TList_ms_new.resize(dimx, dimy, 2, S, 0.);
 		terrain_flux_new.resize(dimx, dimy,2, 0.);
 
@@ -695,7 +709,7 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double>& direct, m
 				double albedo_temp=albedo_grid(ii,jj);
 
 				for (size_t which_triangle = 0; which_triangle < 2; ++which_triangle) // Triangles: A=1, B=0  [MT Figure 2.2]
-				{	
+				{
 					for (size_t solidangle_in = 0; solidangle_in < S; ++solidangle_in)
 					{
 						double Rad_solidangle;
@@ -712,7 +726,7 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double>& direct, m
 						terrain_flux_new(ii, jj, which_triangle)+=Rad_solidangle/S*Cst::PI;
 
 						Rad_solidangle=Rad_solidangle*albedo_temp/S;
-							
+
 						if(!cfg.keyExists("PVPFILE", "EBalance")) continue;
 
 						if (albedo_temp<0.5 || !if_anisotropy){
@@ -724,13 +738,13 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double>& direct, m
 						else{
 							for (size_t solidangle_out = 0; solidangle_out < S; ++solidangle_out)
 							{
-								TList_ms_new(ii,jj,which_triangle, solidangle_out)+=Rad_solidangle*RList(solidangle_in, solidangle_out);			
+								TList_ms_new(ii,jj,which_triangle, solidangle_out)+=Rad_solidangle*RList(solidangle_in, solidangle_out);
 							}
 						}
 					}
 				}
 			}
-		}			
+		}
 	}
 
 	// If SolarPanel-module is used, send all needed data
@@ -748,6 +762,7 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double>& direct, m
 
 	diffuse=diffuse_temp;
 	terrain=terrain_temp;
+  getSkyViewFactor(view_factor);
 
 	std::cout<<"[i] TerrainRadiationComplex converged in "<<number_rounds+1<<" Full Iteration(s).\n";
 }
@@ -767,8 +782,8 @@ void TerrainRadiationComplex::setMeteo(const mio::Array2D<double>& albedo, const
 * @brief returns normalized surface-normal vector [MT 2.1.2 Surface Generation]
 * @param[in] ii_dem: easting DEM-Grid-Point
 * @param[in] jj_dem: northing DEM-Grid-Point
-* @param[in] which_triangle: 1 or 2 
-* @param[out] {n_x,n_y,n_z} 
+* @param[in] which_triangle: 1 or 2
+* @param[out] {n_x,n_y,n_z}
 */
 std::vector<double> TerrainRadiationComplex::TriangleNormal(size_t ii_dem, size_t jj_dem, int which_triangle)
 {
@@ -776,7 +791,7 @@ std::vector<double> TerrainRadiationComplex::TriangleNormal(size_t ii_dem, size_
 	double cellsize=dem.cellsize;
 
 	// Triangles: A=1, B=0  [MT Figure 2.2]
-	if (which_triangle==1) 
+	if (which_triangle==1)
 	{
 		e_x={-cellsize,0, dem(ii_dem-1,jj_dem)-dem(ii_dem,jj_dem)};	//[MT eq. 2.17]
 		e_y={0,cellsize, dem(ii_dem,jj_dem+1)-dem(ii_dem,jj_dem)}; 	//[MT eq. 2.18]
@@ -798,13 +813,13 @@ std::vector<double> TerrainRadiationComplex::TriangleNormal(size_t ii_dem, size_
 * @param[in] v_view: see [MT fig. 2.3]
 * @param[in] nn, mm: origin of v_view. Why not specification of which_triangle in nn,mm? Because have identical base point (DEM-Grid_point) [MT Figure 2.2]
 * @param[in] ii, jj, which_triangle: to check intersection with
-* @param[out] distance  
+* @param[out] distance
 */
 double TerrainRadiationComplex::IntersectionRayTriangle(std::vector<double> v_view, size_t mm, size_t nn, size_t ii, size_t jj, size_t which_triangle)
 {
 	std::vector<double> aufpunkt_ray, balance_point_par, intersection;
 	std::vector<double> e_x,e_y,e_xT,e_yT,n;
-	
+
 
 	double cellsize=dem.cellsize;
 	double distance, P_3, r_3;
@@ -839,11 +854,11 @@ double TerrainRadiationComplex::IntersectionRayTriangle(std::vector<double> v_vi
 	if (distance<0) return -999;						// light cannot cross the ground
 
 	intersection=VectorDifference(VectorSum(aufpunkt_ray, VectorStretch(v_view, distance)), balance_point_par);	// [MT eq. 2.26] or better see [MT fig. 2.3]
-	
-	// Now slightl different (less formal) procedure than [MT eq. 2.27-2.30]: 
+
+	// Now slightl different (less formal) procedure than [MT eq. 2.27-2.30]:
 	// Want elementary vector, that is normal to e_x => crossproduct
 	// scalarproduct with [MT eq. 2.27] projects out intersection_x
-	// same for e_y .. 
+	// same for e_y ..
 	e_xT=VectorCrossProduct(n,e_x);
 	e_yT=VectorCrossProduct(n,e_y);
 
@@ -857,13 +872,13 @@ double TerrainRadiationComplex::IntersectionRayTriangle(std::vector<double> v_vi
 
 
 /**
-* @brief returns for given triangle and vector the closest vector of the corresponding rotated basic set. 
+* @brief returns for given triangle and vector the closest vector of the corresponding rotated basic set.
 * 	Described after [MT fig. 2.5] in [MT 2.1.3 View-List]
 * @param[in] vec_in: vector that is searching for closest rotated basic set-vector
 * @param[in] ii, jj, which_triangle: triangle specification
-* @param[out] list_index: Index of vector in Basic Set  
+* @param[out] list_index: Index of vector in Basic Set
 */
-size_t TerrainRadiationComplex::vectorToSPixel(std::vector<double> vec_in, size_t ii_dem, size_t jj_dem, int which_triangle){
+size_t TerrainRadiationComplex::vectorToSPixel(std::vector<double> vec_in, size_t ii_dem, size_t jj_dem, size_t which_triangle){
 
 	double azimuth_flat;
 	double delta, phi_temp=0, phi;
@@ -884,7 +899,7 @@ size_t TerrainRadiationComplex::vectorToSPixel(std::vector<double> vec_in, size_
 	if (vec_horizontal[2]<0){
 		std::cout<<"Vector lower than horizon TerrainRadiationComplex::vectorToSPixel\n";
 		return -999;
-	} 
+	}
 
 	vec_projected_xy={vec_horizontal[0],vec_horizontal[1],0};
 	azimuth_flat=AngleBetween2Vectors(vec_projected_xy,{0,1,0}); 				// [MT eq. 2.43]
@@ -899,7 +914,7 @@ size_t TerrainRadiationComplex::vectorToSPixel(std::vector<double> vec_in, size_
 		if (i!=(M_epsilon-1)){
 			delta=acos(-2/float(M_epsilon)+cos(2*phi_temp))/2-phi_temp;
 			phi_temp+=delta;
-		} 
+		}
 		else phi_temp=Cst::PI/2;
 		if(phi<=phi_temp) n=i;
 		i+=1;
@@ -916,17 +931,35 @@ size_t TerrainRadiationComplex::vectorToSPixel(std::vector<double> vec_in, size_
 * @param[in] ii, jj, which_triangle: triangle specification
 * @param[out] LandViewFactor
 */
-double TerrainRadiationComplex::getLandViewFactor(size_t ii_dem, size_t jj_dem, int which_triangle)
+double TerrainRadiationComplex::getLandViewFactor(size_t ii_dem, size_t jj_dem, size_t which_triangle)
 {
 	return 1.-getSkyViewFactor(ii_dem, jj_dem, which_triangle);
 }
+
+
+
+void TerrainRadiationComplex::initSkyViewFactor()
+{
+  for (size_t which_triangle = 0; which_triangle < 2; ++which_triangle) // Triangles: A=1, B=0  [MT Figure 2.2]
+  {
+    for (size_t ii = 1; ii < dimx-1; ++ii)
+  	{
+  		for (size_t jj = 1; jj < dimy-1; ++jj)
+  		{
+       sky_vf[which_triangle][ii][jj]=computeSkyViewFactor(ii, jj, which_triangle);
+  		}
+  	}
+  }
+  sky_vf_mean=(sky_vf[0]+sky_vf[1])/2;
+}
+
 
 /**
 * @brief returns land-view factor [MT 2.1.5 View Factors]
 * @param[in] ii, jj, which_triangle: triangle specification
 * @param[out] LandViewFactor
 */
-double TerrainRadiationComplex::getSkyViewFactor(size_t ii_dem, size_t jj_dem, int which_triangle)
+double TerrainRadiationComplex::computeSkyViewFactor(size_t ii_dem, size_t jj_dem, size_t which_triangle)
 {
 	double sum=0;
 
@@ -939,6 +972,14 @@ double TerrainRadiationComplex::getSkyViewFactor(size_t ii_dem, size_t jj_dem, i
 	}
 
 	return sum/S;
+}
+
+void TerrainRadiationComplex::getSkyViewFactor(mio::Array2D<double> &o_sky_vf) {
+	o_sky_vf = sky_vf_mean;
+}
+
+double TerrainRadiationComplex::getSkyViewFactor(size_t ii_dem, size_t jj_dem, size_t which_triangle) {
+	return sky_vf[which_triangle][ii_dem][jj_dem];
 }
 
 /**
@@ -1140,7 +1181,7 @@ double TerrainRadiationComplex::AngleBetween2Vectors(std::vector<double> vec1, s
 {
 	double sum=0;
 	double angle=0;
-	double norm1,norm2; 
+	double norm1,norm2;
 	if(vec1.size()!=vec2.size()) return -999;
 
 	for (size_t i = 0; i < vec1.size(); ++i)
@@ -1176,4 +1217,3 @@ void TerrainRadiationComplex::PrintProgress(double percentage)
     fflush (stdout);
 
 }
-
