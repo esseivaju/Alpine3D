@@ -133,6 +133,16 @@ SnowpackInterface::SnowpackInterface(const mio::Config& io_cfg, const size_t& nb
 	readInitalSnowCover(snow_stations,snow_stations_coord);
 
 	if (mpicontrol.master()) {
+
+    bool write_dem_details=false;
+    io_cfg.getValue("WRITE_DEM_DETAILS", "output", write_dem_details,IOUtils::nothrow);
+    if(write_dem_details){
+      std::cout << "[i] Writing DEM details grids" << std::endl;
+      io.write2DGrid(mio::Grid2DObject(dem.cellsize,dem.llcorner,dem.slope), "DEM_SLOPE");
+      io.write2DGrid(mio::Grid2DObject(dem.cellsize,dem.llcorner,dem.azi), "DEM_AZI");
+      io.write2DGrid(mio::Grid2DObject(dem.cellsize,dem.llcorner,dem.curvature), "DEM_CURVATURE");
+    }
+
 		std::cout << "[i] SnowpackInterface initializing a total of " << mpicontrol.size();
 		if (mpicontrol.size()>1) std::cout << " processes with " << nbworkers;
 		else std::cout << " process with " << nbworkers;
