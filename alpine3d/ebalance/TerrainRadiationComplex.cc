@@ -42,6 +42,15 @@ TerrainRadiationComplex::TerrainRadiationComplex(const mio::Config &cfg_in, cons
 	size_t nx = dimx;
 	MPIControl::instance().getArraySliceParams(dimx, startx, nx);
 	endx = startx + nx;
+	if (startx = 0)
+	{
+		startx = 1;
+	}
+
+	if (endx >= dimx - 1)
+	{
+		endx = dimx - 1;
+	}
 
 	S = M_epsilon * M_phi; // Number of vectors per Basic Set
 
@@ -592,11 +601,6 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, m
 #pragma omp parallel for
 	for (size_t ii = startx; ii < endx; ++ii)
 	{
-		//stop condition for mpi process working on the last slice
-		if (ii >= dimx - 1)
-		{
-			continue;
-		}
 		for (size_t jj = 1; jj < dimy - 1; ++jj)
 		{
 			//////////////////////////////////
@@ -729,10 +733,6 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, m
 #pragma omp parallel for
 		for (size_t ii = startx; ii < endx; ++ii)
 		{
-			if (ii >= dimx - 1)
-			{
-				continue;
-			}
 			for (size_t jj = 1; jj < dimy - 1; ++jj)
 			{
 				double albedo_temp = albedo_grid(ii, jj);
@@ -799,10 +799,6 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, m
 #pragma omp parallel for
 		for (size_t ii = startx; ii < endx; ++ii)
 		{
-			if (ii >= dimx - 1)
-			{
-				continue;
-			}
 			for (size_t jj = 1; jj < dimy - 1; ++jj)
 			{
 				double albedo_temp = albedo_grid(ii, jj);
@@ -857,10 +853,6 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, m
 #pragma omp parallel for
 	for (size_t ii = startx; ii < endx; ++ii)
 	{
-		if (ii >= dimx - 1)
-		{
-			continue;
-		}
 		for (size_t jj = 1; jj < dimy - 1; ++jj)
 		{
 			terrain_temp(ii, jj) = (terrain_flux_new(ii, jj, 1) + terrain_flux_new(ii, jj, 0)) / 2.;
@@ -1138,10 +1130,6 @@ double TerrainRadiationComplex::TerrainBiggestDifference(mio::Array3D<double> te
 
 	for (size_t ii = startx; ii < endx; ++ii)
 	{
-		if (ii >= dimx - 1)
-		{
-			continue;
-		}
 		for (size_t jj = 1; jj < dimy - 1; ++jj)
 		{
 			for (size_t which_triangle = 0; which_triangle < 2; ++which_triangle) // Triangles: A=1, B=0  [MT Figure 2.2]
