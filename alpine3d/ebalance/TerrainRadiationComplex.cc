@@ -42,7 +42,7 @@ TerrainRadiationComplex::TerrainRadiationComplex(const mio::Config &cfg_in, cons
 	size_t nx = dimx;
 	MPIControl::instance().getArraySliceParams(dimx, startx, nx);
 	endx = startx + nx;
-	if (startx = 0)
+	if (startx == 0)
 	{
 		startx = 1;
 	}
