@@ -198,10 +198,10 @@ void TerrainRadiationComplex::initBasicSetRotated()
 				for (size_t solidangle = 0; solidangle < S; ++solidangle)
 				{
 					Vec3D rotated, solid_angle;
-					auto solid_angle_vec = BasicSet_Horizontal[solidangle];
+					auto &solid_angle_vec = BasicSet_Horizontal[solidangle];
 					std::copy_n(solid_angle_vec.begin(), solid_angle.size(), solid_angle.begin());
 					RotN(axis, solid_angle, inclination, rotated); // [MT eq. 2.38]
-					auto to_rotate = BasicSet_rotated(ii, jj, which_triangle, solidangle);
+					auto &to_rotate = BasicSet_rotated(ii, jj, which_triangle, solidangle);
 					for (auto i = 0; i < rotated.size(); ++i)
 					{
 						to_rotate[i] = rotated[i];
@@ -338,8 +338,8 @@ void TerrainRadiationComplex::initRList()
 	{
 		for (size_t number_solid_out = 0; number_solid_out < S; ++number_solid_out)
 		{
-			auto solid_in = BasicSet_Horizontal[number_solid_in];
-			auto solid_out = BasicSet_Horizontal[number_solid_out];
+			auto &solid_in = BasicSet_Horizontal[number_solid_in];
+			auto &solid_out = BasicSet_Horizontal[number_solid_out];
 			Vec3D v_in;
 			std::copy_n(solid_in.begin(), v_in.size(), v_in.begin());
 			Vec3D v_out;
