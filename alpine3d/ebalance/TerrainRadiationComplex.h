@@ -86,27 +86,27 @@ private:
 
 	// auxiliary functions
 	void TriangleNormal(size_t ii_dem, size_t jj_dem, int which_triangle, Vec3D &v_out);
-	double IntersectionRayTriangle(Vec3D &v_view, size_t ii_0, size_t jj_0, size_t ii_dem, size_t jj_dem, size_t which_triangle);
-	size_t vectorToSPixel(Vec3D &vec_in, size_t ii_dem, size_t jj_dem, size_t which_triangle);
+	double IntersectionRayTriangle(const Vec3D &v_view, size_t ii_0, size_t jj_0, size_t ii_dem, size_t jj_dem, size_t which_triangle);
+	size_t vectorToSPixel(const Vec3D &vec_in, size_t ii_dem, size_t jj_dem, size_t which_triangle);
 	void initSkyViewFactor();
 	double computeSkyViewFactor(size_t ii_dem, size_t jj_dem, size_t which_triangle);
 	double getLandViewFactor(size_t ii_dem, size_t jj_dem, size_t which_triangle);
 	double getSkyViewFactor(size_t ii_dem, size_t jj_dem, size_t which_triangle);
 	void getSkyViewFactor(mio::Array2D<double> &o_sky_vf);
 	void getVectorSun(double solarAzimuth, double solarElevation, Vec3D &v_out);
-	double TerrainBiggestDifference(mio::Array3D<double> terrain_old, mio::Array3D<double> terrain_new);
+	double TerrainBiggestDifference(mio::Array3D<double> &terrain_old, mio::Array3D<double> &terrain_new);
 
 	// Standard Vector operations
-	double NormOfVector(Vec3D &vec1);
-	void normalizeVector(Vec3D &vec1, Vec3D &v_out);
-	double VectorScalarProduct(Vec3D &vec1, Vec3D &vec2);
-	void VectorCrossProduct(Vec3D &vec1, Vec3D &vec2, Vec3D &v_out);
-	void VectorSum(Vec3D &vec1, Vec3D &vec2, Vec3D &v_out);
-	void VectorDifference(Vec3D &vec1, Vec3D &vec2, Vec3D &v_out);
-	void VectorStretch(Vec3D &vec1, double factor, Vec3D &v_out);
-	void RotN(Vec3D &axis, Vec3D &vec_in, double rad, Vec3D &v_out);
-	void ProjectVectorToPlane(Vec3D &vec1, Vec3D &plane_normal, Vec3D &v_out);
-	double AngleBetween2Vectors(Vec3D &vec1, Vec3D &vec2);
+	double NormOfVector(const Vec3D &vec1);
+	void normalizeVector(const Vec3D &vec1, Vec3D &v_out);
+	double VectorScalarProduct(const Vec3D &vec1, const Vec3D &vec2);
+	void VectorCrossProduct(const Vec3D &vec1, const Vec3D &vec2, Vec3D &v_out);
+	void VectorSum(const Vec3D &vec1, const Vec3D &vec2, Vec3D &v_out);
+	void VectorDifference(const Vec3D &vec1, const Vec3D &vec2, Vec3D &v_out);
+	void VectorStretch(const Vec3D &vec1, double factor, Vec3D &v_out);
+	void RotN(const Vec3D &axis, const Vec3D &vec_in, double rad, Vec3D &v_out);
+	void ProjectVectorToPlane(const Vec3D &vec1, const Vec3D &plane_normal, Vec3D &v_out);
+	double AngleBetween2Vectors(const Vec3D &vec1, const Vec3D &vec2);
 
 	// Output functions
 	void PrintProgress(double percentage);
@@ -122,8 +122,8 @@ private:
 	SolarPanel *PVobject;
 
 	mio::Array3D<std::vector<double>> SortList;			  // Used for speedup in Terrain Iterations
-	std::vector<std::vector<double>> BasicSet_Horizontal; // Horizontal Basic Set [MT 2.1.1 Basic Set]
-	mio::Array4D<std::vector<double>> BasicSet_rotated;	  // Basic Set rotated in Triangular Pixel Plane [MT 2.1.3 View List, eq. 2.38]
+	std::vector<Vec3D> BasicSet_Horizontal; // Horizontal Basic Set [MT 2.1.1 Basic Set]
+	mio::Array4D<Vec3D> BasicSet_rotated;	  // Basic Set rotated in Triangular Pixel Plane [MT 2.1.3 View List, eq. 2.38]
 	mio::Array4D<std::vector<double>> ViewList;			  // Stores all information of network between pixels [MT 2.1.3 View List, eq. 2.47]
 	mio::Array2D<double> RList;							  // List pre-storage of BRDF values
 	mio::Array2D<double> albedo_grid;					  // Albedo value for each square Pixel
