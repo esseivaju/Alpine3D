@@ -94,7 +94,7 @@ private:
 	double getSkyViewFactor(size_t ii_dem, size_t jj_dem, size_t which_triangle);
 	void getSkyViewFactor(mio::Array2D<double> &o_sky_vf);
 	void getVectorSun(double solarAzimuth, double solarElevation, Vec3D &v_out);
-	double TerrainBiggestDifference(mio::Array3D<double> &terrain_old, mio::Array3D<double> &terrain_new);
+	double TerrainBiggestDifference(const mio::Array3D<double> &terrain_old, const mio::Array3D<double> &terrain_new);
 
 	// Standard Vector operations
 	double NormOfVector(const Vec3D &vec1);

@@ -1112,7 +1112,7 @@ void TerrainRadiationComplex::getVectorSun(double solarAzimuth, double solarElev
 * @param[in] terrain_1, terrain_2: usually two Triangle-Arrays with Ground-reflected flux density
 * @param[out] max_diff: biggest point-like difference
 */
-double TerrainRadiationComplex::TerrainBiggestDifference(mio::Array3D<double> &terrain_1, mio::Array3D<double> &terrain_2)
+double TerrainRadiationComplex::TerrainBiggestDifference(const mio::Array3D<double> &terrain_1, const mio::Array3D<double> &terrain_2)
 {
 
 	double max_diff = 0, diff;
