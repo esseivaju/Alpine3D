@@ -1011,7 +1011,7 @@ size_t TerrainRadiationComplex::vectorToSPixel(const Vec3D &vec_in, size_t ii_de
 	}
 
 	Vec3D vec_projected_xy = {vec_horizontal[0], vec_horizontal[1], 0};
-	azimuth_flat = AngleBetween2Vectors(vec_projected_xy, z_axis); // [MT eq. 2.43]
+	azimuth_flat = AngleBetween2Vectors(vec_projected_xy, {0, 1, 0}); // [MT eq. 2.43]
 	if (vec_projected_xy[0] < 0)
 		azimuth_flat = 2 * Cst::PI - azimuth_flat;				  // AngleBetween2Vectors is not uniquely defined;
 	phi = AngleBetween2Vectors(vec_horizontal, vec_projected_xy); // [MT eq. 2.44]
