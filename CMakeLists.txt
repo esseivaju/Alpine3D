@@ -80,6 +80,7 @@ SET(ALPINE3D_STANDALONE ON CACHE BOOL "Compilation Alpine3D standalone ON or OFF
 SET(MPI OFF CACHE BOOL "Compile with MPI support ON or OFF")
 SET(OPENMP OFF CACHE BOOL "Compile with OPENMP support ON or OFF")
 SET(PETSC OFF CACHE BOOL "Compile with PETSc support ON or OFF")
+SET(PROFILING OFF CACHE BOOL "Link the profiler library")
 
 IF(PETSC)
 	SET(PETSC_FLAGS "-DENABLE_PETSC")
