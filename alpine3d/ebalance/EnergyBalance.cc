@@ -177,7 +177,7 @@ void EnergyBalance::setMeteo(const mio::Grid2DObject& in_ilwr,
 		radfields[ii]->setMeteo(mio::Grid2DObject(in_ta, startx, 0, nx, dimy),
 		                       mio::Grid2DObject(in_rh, startx, 0, nx, dimy),
 		                       mio::Grid2DObject(in_p, startx, 0, nx, dimy),
-		                       mio::Grid2DObject(albedo, startx, 0, nx, dimy));
+		                       albedo);//mio::Grid2DObject(albedo, startx, 0, nx, dimy));
 
 		mio::Array2D<double> band_direct, band_diffuse, band_direct_unshaded_horizontal;
 		radfields[ii]->getRadiation(band_direct, band_diffuse, band_direct_unshaded_horizontal);
