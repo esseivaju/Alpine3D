@@ -45,12 +45,6 @@ TerrainRadiationAlgorithm* TerrainRadiationFactory::getAlgorithm(const Config& c
 		return new TerrainRadiationComplex(cfg, dem, method, radfield, PVobject);
 	} else if (method == "FULL") {
 		return new TerrainRadiation(cfg, dem, nbworkers, method);
-	} else if (method == "PETSC") {
-	#ifdef ENABLE_PETSC
-		return new TerrainRadiationPETSc(cfg, dem, nbworkers, method);
-	#else
-		throw IOException("To use terrain radiation method '"+method+"' activate PETSc compilation option" , AT);
-	#endif
 	} else {
 		throw IOException("The terrain radiation method '"+method+"' is not implemented/activated" , AT);
 	}

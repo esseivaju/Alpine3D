@@ -38,7 +38,7 @@ IF(UNIX)
 	ELSE(APPLE)
 		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath,'$ORIGIN',-rpath,'$ORIGIN'/../lib")
 	ENDIF(APPLE)
-	
+
 	# add the automatically determined parts of the RPATH
 	SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 	# the RPATH to be used when installing, but only if it's not a system directory
@@ -79,14 +79,8 @@ FIND_PACKAGE(Libsnowpack REQUIRED)
 SET(ALPINE3D_STANDALONE ON CACHE BOOL "Compilation Alpine3D standalone ON or OFF")
 SET(MPI OFF CACHE BOOL "Compile with MPI support ON or OFF")
 SET(OPENMP OFF CACHE BOOL "Compile with OPENMP support ON or OFF")
-SET(PETSC OFF CACHE BOOL "Compile with PETSc support ON or OFF")
 SET(PROFILING OFF CACHE BOOL "Link the profiler library")
 
-IF(PETSC)
-	SET(PETSC_FLAGS "-DENABLE_PETSC")
-	UNSET(MPI CACHE)
-	SET (MPI ON CACHE BOOL "Compile with MPI support ON or OFF")
-ENDIF(PETSC)
 IF(MPI)
 	SET(MPI_FLAGS "-DENABLE_MPI")
 ENDIF(MPI)
@@ -96,7 +90,7 @@ ENDIF(OPENMP)
 
 ###########################################################
 #finally, SET compile flags
-SET(CMAKE_CXX_FLAGS "${PETSC_FLAGS} ${MPI_FLAGS} ${OPENMP_FLAGS} ${_VERSION} ${ARCH} ${EXTRA}" CACHE STRING "" FORCE)
+SET(CMAKE_CXX_FLAGS "${MPI_FLAGS} ${OPENMP_FLAGS} ${_VERSION} ${ARCH} ${EXTRA}" CACHE STRING "" FORCE)
 SET(CMAKE_CXX_FLAGS_RELEASE "${OPTIM}" CACHE STRING "" FORCE)
 SET(CMAKE_CXX_FLAGS_DEBUG "${DEBUG} ${WARNINGS} ${EXTRA_WARNINGS}" CACHE STRING "" FORCE)
 SET(CMAKE_CXX_FLAGS_CXXFLAGS "$ENV{CXXFLAGS}" CACHE STRING "" FORCE)
@@ -194,7 +188,7 @@ SET(CPACK_BUNDLE_ALL OFF CACHE BOOL "Pack all necessary libs and tools for a sta
 IF(CPACK_BUNDLE_ALL)
 	SET(ALL_RX_PERM OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 	SET(ALL_RO_PERM OWNER_READ GROUP_READ WORLD_READ)
-	
+
 	#standard libraries must be installed for gcc on Windows
 	IF(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "^GNU$")
 		SET(CPACK_BUNDLE_STDLIBS ON CACHE BOOL "Pack all necessary standard libs for a standalone release")
@@ -208,7 +202,7 @@ IF(CPACK_BUNDLE_ALL)
 			INSTALL(FILES ${winpthreads} ${stdlibs} ${libgcc} DESTINATION bin PERMISSIONS ${ALL_RX_PERM} COMPONENT exe)
 		ENDIF(CPACK_BUNDLE_STDLIBS)
 	ENDIF(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "^GNU$")
-	
+
 	#bundle MeteoIO
 	FIND_PACKAGE(MeteoIO REQUIRED)
 	IF(BUILD_SHARED_LIBS) #consider that if STATIC, we don't need the libs
@@ -276,7 +270,7 @@ IF(CPACK_BUNDLE_ALL)
 # 		INSTALL(FILES ${inishell} ${inishell-dll} DESTINATION bin PERMISSIONS ${ALL_RX_PERM} COMPONENT exe)
 # 		INSTALL(FILES ${inishell-xml} ${inishell-png} DESTINATION share/inishell-apps PERMISSIONS ${ALL_RO_PERM} COMPONENT resources)
 # 	ENDIF(NOT APPLE)
-	
+
 	#bundle the grid viewer
 	FILE(GLOB grid_view "${CMAKE_SOURCE_DIR}/tools/Interface/view.*")
 	IF("${grid_view}" STREQUAL "")
