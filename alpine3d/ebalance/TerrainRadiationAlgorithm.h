@@ -41,7 +41,7 @@ class TerrainRadiationAlgorithm {
 		// FELIX: mio::Array2D<double>& direct_unshaded_horizontal
 		virtual void getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse,
                               mio::Array2D<double>& terrain, mio::Array2D<double>& direct_unshaded_horizontal,
-                              mio::Array2D<double>& view_factor) = 0;
+                              mio::Array2D<double>& view_factor, double solarAzimuth, double solarElevation) = 0;
 		virtual void setMeteo(const mio::Array2D<double>& albedo, const mio::Array2D<double>& ta,
 		                      const mio::Array2D<double>& rh, const mio::Array2D<double>& ilwr) = 0;
 		const std::string algo;
@@ -50,7 +50,7 @@ class TerrainRadiationAlgorithm {
 class TerrainRadiationFactory {
 	public:
 		// FELIX: const RadiationField* radfield
-		static TerrainRadiationAlgorithm* getAlgorithm(const mio::Config& cfg, const mio::DEMObject &dem, const int& nbworkers, const RadiationField* radfield, SolarPanel* PVPobject);
+		static TerrainRadiationAlgorithm* getAlgorithm(const mio::Config& cfg, const mio::DEMObject &dem, const int& nbworkers, SolarPanel* PVPobject);
 
 };
 

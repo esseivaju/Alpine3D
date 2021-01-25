@@ -83,7 +83,7 @@ TerrainRadiation::TerrainRadiation(const mio::Config& cfg, const mio::DEMObject&
 
 void TerrainRadiation::getRadiation(const mio::Array2D<double>& direct, mio::Array2D<double>& diffuse,
                                     mio::Array2D<double>& terrain, mio::Array2D<double>& direct_unshaded_horizontal,
-                                    mio::Array2D<double>& view_factor)
+                                    mio::Array2D<double>& view_factor, double solarAzimuth, double solarElevation)
 {
 	if (MPIControl::instance().master())
 		printf("[i] Calculating terrain radiation with standard method\n");

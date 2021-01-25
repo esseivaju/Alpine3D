@@ -31,7 +31,8 @@ using namespace mio;
 TerrainRadiationAlgorithm::~TerrainRadiationAlgorithm() {}
 // FELIX: const RadiationField* radfield
 //please document these keywords in EnergyBalance.h
-TerrainRadiationAlgorithm* TerrainRadiationFactory::getAlgorithm(const Config& cfg, const DEMObject &dem, const int& nbworkers, const RadiationField* radfield, SolarPanel* PVobject)
+TerrainRadiationAlgorithm* TerrainRadiationFactory::getAlgorithm(const Config& cfg, const DEMObject &dem,
+                                                                 const int& nbworkers, SolarPanel* PVobject)
 {
 	string method = "SIMPLE";
 	cfg.getValue("Terrain_Radiation_Method", "EBalance", method, IOUtils::nothrow);
@@ -42,7 +43,7 @@ TerrainRadiationAlgorithm* TerrainRadiationFactory::getAlgorithm(const Config& c
 	} else if (method == "HELBIG") {
 		return new TerrainRadiationHelbig(cfg, dem, nbworkers, method);
 	} else if (method == "COMPLEX") {
-		return new TerrainRadiationComplex(cfg, dem, method, radfield, PVobject);
+		return new TerrainRadiationComplex(cfg, dem, method, PVobject);
 	} else if (method == "FULL") {
 		return new TerrainRadiation(cfg, dem, nbworkers, method);
 	} else {

@@ -28,9 +28,12 @@
 
 using namespace mio;
 
-TerrainRadiationComplex::TerrainRadiationComplex(const mio::Config &cfg_in, const mio::DEMObject &dem_in, const std::string &method, const RadiationField *radfield, SolarPanel *PVobject_in)
-	: TerrainRadiationAlgorithm(method), dimx(dem_in.getNx()), dimy(dem_in.getNy()), startx(0), endx(dimx), dem(dem_in), cfg(cfg_in), BRDFobject(cfg_in),
-	  radobject(radfield), PVobject(PVobject_in), albedo_grid(dem_in.getNx(), dem_in.getNy(), IOUtils::nodata), sky_vf(2, mio::Array2D<double>(dimx, dimy, IOUtils::nodata)), sky_vf_mean(dimx, dimy, IOUtils::nodata)
+TerrainRadiationComplex::TerrainRadiationComplex(const mio::Config &cfg_in, const mio::DEMObject &dem_in,
+                                                 const std::string &method, SolarPanel *PVobject_in)
+  : TerrainRadiationAlgorithm(method), dimx(dem_in.getNx()), dimy(dem_in.getNy()), startx(0), endx(dimx),
+    dem(dem_in), cfg(cfg_in), BRDFobject(cfg_in), PVobject(PVobject_in),
+    albedo_grid(dem_in.getNx(), dem_in.getNy(), IOUtils::nodata),
+    sky_vf(2, mio::Array2D<double>(dimx, dimy, IOUtils::nodata)), sky_vf_mean(dimx, dimy, IOUtils::nodata)
 {
 	// PRECISION PARAMETERS
 	// ####################
@@ -566,7 +569,10 @@ bool TerrainRadiationComplex::ReadViewList()
 * @param[out] -
 *
 */
-void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, mio::Array2D<double> &diffuse, mio::Array2D<double> &terrain, mio::Array2D<double> &direct_unshaded_horizontal, mio::Array2D<double> &view_factor)
+void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, mio::Array2D<double> &diffuse,
+                                           mio::Array2D<double> &terrain, mio::Array2D<double>
+                                           &direct_unshaded_horizontal, mio::Array2D<double> &view_factor,
+                                           double solarAzimuth, double solarElevation)
 {
 	MPIControl &mpicontrol = MPIControl::instance();
 
@@ -584,9 +590,6 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, m
 	// Direct, Diffuse, and Terrain Fux densities (averaged to square grid)
 	mio::Array2D<double> direct_temp(dimx, dimy, 0.), diffuse_temp(dimx, dimy, 0.), terrain_temp(dimx, dimy, 0.);
 
-	// Get Sun-Vector
-	double solarAzimuth, solarElevation;
-	radobject->getPositionSun(solarAzimuth, solarElevation);
 	Vec3D a_sun;
 	getVectorSun(solarAzimuth, solarElevation, a_sun);
 	Vec3D z_axis = {0, 0, 1};
@@ -715,9 +718,8 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, m
 
 		TList_ms_old = TList_ms_new + TList_sky_aniso;
 		terrain_flux_old = terrain_flux_new;
-
-		TList_ms_new.resize(dimx, dimy, 2, S, 0.);
-		terrain_flux_new.resize(dimx, dimy, 2, 0.);
+		TList_ms_new=0;
+		terrain_flux_new=0;
 
 #pragma omp parallel for
 		for (size_t ii = startx; ii < endx; ++ii)
@@ -781,9 +783,8 @@ void TerrainRadiationComplex::getRadiation(const mio::Array2D<double> &direct, m
 	{
 		TList_ms_old = TList_ms_new + TList_sky_aniso;
 		terrain_flux_old = terrain_flux_new;
-
-		TList_ms_new.resize(dimx, dimy, 2, S, 0.);
-		terrain_flux_new.resize(dimx, dimy, 2, 0.);
+		TList_ms_new=0;
+		terrain_flux_new=0;
 
 #pragma omp parallel for
 		for (size_t ii = startx; ii < endx; ++ii)

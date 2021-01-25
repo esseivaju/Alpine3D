@@ -3,7 +3,7 @@ PARALLEL=OPENMP
 NCORES=16
 
 BEGIN="2017-09-01T02:00"
-END="2018-08-31T23:00"
+END="2017-08-31T23:00"
 # "2018-08-31T23:00"
 PROG_ROOTDIR=~/usr/bin	#if you do not want to use Alpine3D from PATH, then point to where it is
 
@@ -19,8 +19,7 @@ A3D_CMD="${EXE} \
 --np-snowpack=${NCORES} \
 --startdate=${BEGIN} --enddate=${END}"
 
-${A3D_CMD} > stdouterr.log 2>&1 $*
-ret=$?
+${A3D_CMD} 
 
 echo "Done Alpine3D Simulation. Return code=$ret"
 exit $ret

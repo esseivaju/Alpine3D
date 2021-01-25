@@ -48,18 +48,15 @@ EnergyBalance::EnergyBalance(const unsigned int& i_nbworkers, const mio::Config&
 	if (instance.master())
 		std::cout << "[i] EnergyBalance initialized a total of " << instance.size() << " process(es) with " << nbworkers << " worker(s) each\n";
 
-	// FELIX
 	if (cfg.keyExists("PVPFILE", "EBalance"))
 	{
 		//load PVP data
 		readPVP();
-
 		//performs some validation on loaded data
 		std::vector<Coords> co_vec;
 		for (size_t ii = 0; ii < pv_points.size(); ii++)
 		{
 			Coords point;
-			//point.setLatLon(pv_points[ii][0], pv_points[ii][1], pv_points[ii][2]);
 			point.setXY(pv_points[ii][0], pv_points[ii][1], pv_points[ii][2]);
 			co_vec.push_back(point);
 		}
@@ -83,7 +80,7 @@ EnergyBalance::EnergyBalance(const unsigned int& i_nbworkers, const mio::Config&
 	// Every MPI process will have its own copy of terrain_radiation object with full DEM
 	const bool enable_terrain_radiation = cfg.get("Terrain_Radiation", "EBalance");
 	if (enable_terrain_radiation) {
-		terrain_radiation = TerrainRadiationFactory::getAlgorithm(cfg, dem, nbworkers, radfields[0], PVP); 	// FELIX:  radfields[0]
+		terrain_radiation = TerrainRadiationFactory::getAlgorithm(cfg, dem, nbworkers, PVP);
 		const std::string algo = terrain_radiation->algo;
 		if (instance.master())
 			std::cout << "[i] Using terrain radiation with model: " << algo << "\n";
@@ -188,19 +185,20 @@ void EnergyBalance::setMeteo(const mio::Grid2DObject& in_ilwr,
 	MPIControl::instance().allreduce_sum(direct);
 	MPIControl::instance().allreduce_sum(diffuse);
 	MPIControl::instance().allreduce_sum(direct_unshaded_horizontal);
+	double solarAzimuth, solarElevation;
+	radfields[0]->getPositionSun(solarAzimuth, solarElevation);
 
-
-	// FELIX
 	if (cfg.keyExists("PVPFILE", "EBalance"))
 	{
 		PVP->setGridRadiation(albedo, direct, diffuse, direct_unshaded_horizontal);
 	}
 
-  mio::Array2D<double> view_factor(dimx, dimy, IOUtils::nodata);
+	mio::Array2D<double> view_factor(dimx, dimy, IOUtils::nodata);
 	if (terrain_radiation) {
 		// note: parallelization has to take place inside the TerrainRadiationAlgorithm implementations
 		terrain_radiation->setMeteo(albedo.grid2D, in_ta.grid2D, in_rh.grid2D, in_ilwr.grid2D);
-		terrain_radiation->getRadiation(direct, diffuse, reflected, direct_unshaded_horizontal,view_factor);
+		terrain_radiation->getRadiation(direct, diffuse, reflected, direct_unshaded_horizontal,view_factor,
+                                    solarAzimuth, solarElevation);
 	}
 
 	if (MPIControl::instance().master())

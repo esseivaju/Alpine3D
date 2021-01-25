@@ -66,10 +66,11 @@ class TerrainRadiationComplex : public TerrainRadiationAlgorithm
 {
 
 public:
-	TerrainRadiationComplex(const mio::Config &cfg, const mio::DEMObject &dem_in, const std::string &method, const RadiationField *radfield, SolarPanel *PVobject_in);
+	TerrainRadiationComplex(const mio::Config &cfg, const mio::DEMObject &dem_in, const std::string &method,
+                          SolarPanel *PVobject_in);
 	~TerrainRadiationComplex();
 
-	void getRadiation(const mio::Array2D<double> &direct, mio::Array2D<double> &diffuse, mio::Array2D<double> &terrain, mio::Array2D<double> &direct_unshaded_horizontal, mio::Array2D<double> &view_factor);
+	void getRadiation(const mio::Array2D<double> &direct, mio::Array2D<double> &diffuse, mio::Array2D<double> &terrain, mio::Array2D<double> &direct_unshaded_horizontal, mio::Array2D<double> &view_factor, double solarAzimuth, double solarElevation);
 	void setMeteo(const mio::Array2D<double> &albedo, const mio::Array2D<double> &ta, const mio::Array2D<double> &rh, const mio::Array2D<double> &ilwr);
 
 private:
@@ -118,7 +119,6 @@ private:
 	const mio::Config &cfg;
 
 	SnowBRDF BRDFobject;
-	const RadiationField *radobject;
 	SolarPanel *PVobject;
 
 	mio::Array3D<std::vector<double>> SortList;			  // Used for speedup in Terrain Iterations
