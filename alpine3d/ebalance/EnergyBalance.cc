@@ -24,7 +24,7 @@ using namespace std;
 
 // FELIX: added pv_pts, pv_points
 EnergyBalance::EnergyBalance(const unsigned int& i_nbworkers, const mio::Config& cfg_in, const mio::DEMObject &dem_in)
-              : snowpack(NULL), terrain_radiation(NULL), radfields(i_nbworkers), dem(dem_in), vecMeteo(),
+              : snowpack(NULL), terrain_radiation(NULL), radfields(), dem(dem_in), vecMeteo(),
                 albedo(dem_in, 0.), direct_unshaded_horizontal(), direct(), diffuse(), reflected(),
                 timer(), dimx(dem_in.getNx()), dimy(dem_in.getNy()), nbworkers(i_nbworkers), pv_points(), PVP(nullptr), cfg(cfg_in)
 {
@@ -34,15 +34,12 @@ EnergyBalance::EnergyBalance(const unsigned int& i_nbworkers, const mio::Config&
 	size_t startx = 0, nx = dimx;
 	instance.getArraySliceParams(dimx, startx, nx);
 
-	#pragma omp parallel for schedule(static)
 	for (size_t ii=0; ii<nbworkers; ii++) {
 		size_t thread_startx, thread_nx;
 		OMPControl::getArraySliceParams(nx, nbworkers, ii, thread_startx, thread_nx);
 		const size_t offset = startx + thread_startx;
-
-		#pragma omp critical(ebWorkers_status)
 		std::cout << "[i] EnergyBalance worker " << ii << " on process " << instance.rank() << " will start at offset " << offset << " with nx " << thread_nx << "\n";
-		radfields[ii] = RadiationField(dem_in, offset, thread_nx);
+		radfields.push_back(RadiationField(dem_in, offset, thread_nx));
 	}
 
 	if (instance.master())
@@ -137,18 +134,19 @@ void EnergyBalance::setAlbedo(const mio::Grid2DObject& in_albedo)
 {
 	albedo = in_albedo;
 
-	direct_unshaded_horizontal.resize(0, 0); //FELIX
-	direct.resize(0, 0); //resetting these grids that are not valid anymore
-	diffuse.resize(0, 0);
-	reflected.resize(0, 0);
+	//resetting these grids that are not valid anymore
+	direct_unshaded_horizontal=0;
+	direct=0;
+	diffuse=0;
+	reflected=0;
 }
 
 void EnergyBalance::setStations(const std::vector<mio::MeteoData>& in_vecMeteo)
 {
 	vecMeteo = in_vecMeteo;
-
-	direct_unshaded_horizontal.resize(0, 0); //FELIX
-	direct.resize(0, 0); //resetting these grids that are not valid anymore
+	//resetting these grids that are not valid anymore
+	direct_unshaded_horizontal=0;
+	direct.resize(0, 0);
 	diffuse.resize(0, 0);
 	reflected.resize(0, 0);
 }
@@ -157,9 +155,6 @@ void EnergyBalance::setMeteo(const mio::Grid2DObject& in_ilwr,
                              const mio::Grid2DObject& in_ta, const mio::Grid2DObject& in_rh, const mio::Grid2DObject& in_p, const mio::Date timestamp)
 {
 	timer.restart();
-	direct.resize(dimx, dimy);
-	diffuse.resize(dimx, dimy);
-	direct_unshaded_horizontal.resize(dimx, dimy);
 
 	#pragma omp parallel for schedule(dynamic)
 	for (size_t ii=0; ii<nbworkers; ii++) {
