@@ -24,9 +24,10 @@ using namespace std;
 
 // FELIX: added pv_pts, pv_points
 EnergyBalance::EnergyBalance(const unsigned int& i_nbworkers, const mio::Config& cfg_in, const mio::DEMObject &dem_in)
-              : snowpack(NULL), terrain_radiation(NULL), radfields(), dem(dem_in), vecMeteo(),
-                albedo(dem_in, 0.), direct_unshaded_horizontal(), direct(), diffuse(), reflected(),
-                timer(), dimx(dem_in.getNx()), dimy(dem_in.getNy()), nbworkers(i_nbworkers), pv_points(), PVP(nullptr), cfg(cfg_in)
+              : snowpack(NULL), terrain_radiation(NULL), radfields(), dem(dem_in), vecMeteo(),  dimx(dem_in.getNx()),
+                dimy(dem_in.getNy()), albedo(dem, 0.), direct_unshaded_horizontal(dimx, dimy, 0.),
+                direct(dimx, dimy, 0.), diffuse(dimx, dimy, 0.), reflected(dimx, dimy, 0.), timer(),
+                nbworkers(i_nbworkers), pv_points(), PVP(nullptr), cfg(cfg_in)
 {
 
 	MPIControl& instance = MPIControl::instance();
@@ -133,7 +134,6 @@ void EnergyBalance::setSnowPack(SnowpackInterface& mysnowpack)
 void EnergyBalance::setAlbedo(const mio::Grid2DObject& in_albedo)
 {
 	albedo = in_albedo;
-
 	//resetting these grids that are not valid anymore
 	direct_unshaded_horizontal=0;
 	direct=0;
@@ -146,9 +146,9 @@ void EnergyBalance::setStations(const std::vector<mio::MeteoData>& in_vecMeteo)
 	vecMeteo = in_vecMeteo;
 	//resetting these grids that are not valid anymore
 	direct_unshaded_horizontal=0;
-	direct.resize(0, 0);
-	diffuse.resize(0, 0);
-	reflected.resize(0, 0);
+	direct=0;
+	diffuse=0;
+	reflected=0;
 }
 
 void EnergyBalance::setMeteo(const mio::Grid2DObject& in_ilwr,

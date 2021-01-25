@@ -97,6 +97,7 @@ class EnergyBalance
 		std::vector<RadiationField> radfields;
 		mio::DEMObject dem;
 		std::vector<mio::MeteoData> vecMeteo;
+		size_t dimx, dimy;
 		mio::Grid2DObject albedo;
 		mio::Array2D<double> direct_unshaded_horizontal, direct, diffuse, reflected; //FELIX: direct_unshaded_horizontal
 		mio::Timer timer;
@@ -104,7 +105,6 @@ class EnergyBalance
 		//FELIX
 		SolarPanel *PVP;
 		const mio::Config& cfg;
-		size_t dimx, dimy;
 		unsigned int nbworkers;
 };
 
