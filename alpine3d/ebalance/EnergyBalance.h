@@ -94,7 +94,7 @@ class EnergyBalance
 	private:
 		SnowpackInterface *snowpack;
 		TerrainRadiationAlgorithm *terrain_radiation;
-		std::vector<RadiationField*> radfields;
+		std::vector<RadiationField> radfields;
 		mio::DEMObject dem;
 		std::vector<mio::MeteoData> vecMeteo;
 		mio::Grid2DObject albedo;

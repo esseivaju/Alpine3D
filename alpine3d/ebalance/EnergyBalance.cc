@@ -42,7 +42,7 @@ EnergyBalance::EnergyBalance(const unsigned int& i_nbworkers, const mio::Config&
 
 		#pragma omp critical(ebWorkers_status)
 		std::cout << "[i] EnergyBalance worker " << ii << " on process " << instance.rank() << " will start at offset " << offset << " with nx " << thread_nx << "\n";
-		radfields[ii] = new RadiationField(dem_in, offset, thread_nx);
+		radfields[ii] = RadiationField(dem_in, offset, thread_nx);
 	}
 
 	if (instance.master())
@@ -73,7 +73,7 @@ EnergyBalance::EnergyBalance(const unsigned int& i_nbworkers, const mio::Config&
 		else if (master)
 			std::cout << "[i] Using " << pv_points.size() << " PVP\n";
 
-		if(cfg.get("Terrain_Radiation", "EBalance")) PVP= new SolarPanel(cfg, dem, pv_points, radfields[0]);
+		if(cfg.get("Terrain_Radiation", "EBalance")) PVP= new SolarPanel(cfg, dem, pv_points, &radfields[0]);
 	}
 
 
@@ -118,11 +118,6 @@ std::string EnergyBalance::getGridsRequirements() const
 
 void EnergyBalance::Destroy()
 {
-	while (!radfields.empty()) {
-		delete radfields.back();
-		radfields.pop_back();
-	}
-
 	if (terrain_radiation) {
 		delete terrain_radiation;
 		terrain_radiation = NULL;
@@ -168,16 +163,16 @@ void EnergyBalance::setMeteo(const mio::Grid2DObject& in_ilwr,
 
 	#pragma omp parallel for schedule(dynamic)
 	for (size_t ii=0; ii<nbworkers; ii++) {
-		radfields[ii]->setStations(vecMeteo, albedo); //calculate the parameters at the radiation stations
+		radfields[ii].setStations(vecMeteo, albedo); //calculate the parameters at the radiation stations
 		size_t startx, nx;
-		radfields[ii]->getBandOffsets(startx, nx);
-		radfields[ii]->setMeteo(mio::Grid2DObject(in_ta, startx, 0, nx, dimy),
+		radfields[ii].getBandOffsets(startx, nx);
+		radfields[ii].setMeteo(mio::Grid2DObject(in_ta, startx, 0, nx, dimy),
 		                       mio::Grid2DObject(in_rh, startx, 0, nx, dimy),
 		                       mio::Grid2DObject(in_p, startx, 0, nx, dimy),
 		                       mio::Grid2DObject(albedo, startx, 0, nx, dimy));
 
 		mio::Array2D<double> band_direct, band_diffuse, band_direct_unshaded_horizontal;
-		radfields[ii]->getRadiation(band_direct, band_diffuse, band_direct_unshaded_horizontal);
+		radfields[ii].getRadiation(band_direct, band_diffuse, band_direct_unshaded_horizontal);
 		direct.fill(band_direct, startx, 0, nx, dimy);
 		diffuse.fill(band_diffuse, startx, 0, nx, dimy);
 		direct_unshaded_horizontal.fill(band_direct_unshaded_horizontal, startx, 0, nx, dimy);
@@ -186,7 +181,7 @@ void EnergyBalance::setMeteo(const mio::Grid2DObject& in_ilwr,
 	MPIControl::instance().allreduce_sum(diffuse);
 	MPIControl::instance().allreduce_sum(direct_unshaded_horizontal);
 	double solarAzimuth, solarElevation;
-	radfields[0]->getPositionSun(solarAzimuth, solarElevation);
+	radfields[0].getPositionSun(solarAzimuth, solarElevation);
 
 	if (cfg.keyExists("PVPFILE", "EBalance"))
 	{
@@ -206,7 +201,7 @@ void EnergyBalance::setMeteo(const mio::Grid2DObject& in_ilwr,
 
 	if (snowpack) {
 		double solarAzimuth, solarElevation;
-		radfields[0]->getPositionSun(solarAzimuth, solarElevation); //we need it only for handing over to snowpack
+		radfields[0].getPositionSun(solarAzimuth, solarElevation); //we need it only for handing over to snowpack
 
 		mio::Array2D<double> ilwr = in_ilwr.grid2D;
 		mio::Array2D<double> global = direct+diffuse; //otherwise the compiler does not match the types
