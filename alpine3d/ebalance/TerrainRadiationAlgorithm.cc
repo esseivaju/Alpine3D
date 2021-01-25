@@ -44,8 +44,6 @@ TerrainRadiationAlgorithm* TerrainRadiationFactory::getAlgorithm(const Config& c
 		return new TerrainRadiationHelbig(cfg, dem, nbworkers, method);
 	} else if (method == "COMPLEX") {
 		return new TerrainRadiationComplex(cfg, dem, method, PVobject);
-	} else if (method == "FULL") {
-		return new TerrainRadiation(cfg, dem, nbworkers, method);
 	} else {
 		throw IOException("The terrain radiation method '"+method+"' is not implemented/activated" , AT);
 	}
